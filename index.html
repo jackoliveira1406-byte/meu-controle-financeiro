@@ -99,12 +99,19 @@
   if(!email||!password){msg('authMessage','Informe e-mail e senha.','error');return;}
   if(!db){msg('authMessage','A conexão ainda não foi iniciada. Atualize a página.','error');return;}
   msg('authMessage','Validando acesso...','muted');
+  $('loginBtn').disabled=true;
   try {
-   const {error}=await db.auth.signInWithPassword({email,password});
+   const {data,error}=await db.auth.signInWithPassword({email,password});
    if(error){msg('authMessage','Não foi possível entrar: '+error.message,'error');return;}
-   msg('authMessage','Acesso confirmado. Carregando seus lançamentos...','success');
+   if(!data || !data.session){msg('authMessage','O Supabase não retornou uma sessão. Verifique se o usuário confirmou o e-mail no painel Authentication > Users.','error');return;}
+   // Atualiza a interface com a sessão retornada pela própria chamada de login.
+   // Não depende apenas do evento onAuthStateChange do navegador.
+   await setSession(data.session);
+   msg('authMessage','Login realizado com sucesso.','success');
   } catch(err) {
-   msg('authMessage','Falha de conexão: '+(err.message||String(err)),'error');
+   msg('authMessage','Falha ao entrar: '+(err.message||String(err)),'error');
+  } finally {
+   $('loginBtn').disabled=false;
   }
  }
  $('loginBtn').onclick=login;
