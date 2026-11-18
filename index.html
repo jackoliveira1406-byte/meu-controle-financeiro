@@ -71,19 +71,54 @@
  function msg(id,t,c='muted'){ $(id).textContent=t;$(id).className=c; }
  function monthRange(v){if(!v)return null;const[y,m]=v.split('-').map(Number);return{start:y+'-'+String(m).padStart(2,'0')+'-01',end=(m===12?y+1:y)+'-'+String(m===12?1:m+1).padStart(2,'0')+'-01'};}
  async function init(){
-  if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){msg('authMessage','Configuração do Supabase não encontrada.','error');return;}
-  db=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
-  const {data,error}=await db.auth.getSession(); if(error){msg('authMessage',error.message,'error');return;} await setSession(data.session);
-  db.auth.onAuthStateChange((_e,s)=>setSession(s));
+  try {
+   if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){msg('authMessage','Configuração do Supabase não encontrada. Confira o arquivo config.js.','error');return;}
+   if(!window.supabase || typeof window.supabase.createClient!=='function'){
+    msg('authMessage','A biblioteca de conexão do Supabase não carregou. Atualize a página e verifique sua internet ou bloqueadores do navegador.','error');return;
+   }
+   db=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+   const {data,error}=await db.auth.getSession();
+   if(error){msg('authMessage','Falha ao iniciar a autenticação: '+error.message,'error');return;}
+   await setSession(data.session);
+   // Não executar chamadas Supabase dentro do callback de autenticação:
+   // agenda a atualização da interface após o callback terminar.
+   db.auth.onAuthStateChange((_event,session)=>{
+    setTimeout(()=>{setSession(session).catch(err=>msg('dataMessage','Erro ao carregar os lançamentos: '+err.message,'error'));},0);
+   });
+  } catch(err) {
+   msg('authMessage','Não foi possível iniciar o aplicativo: '+(err.message||String(err)),'error');
+  }
  }
- async function setSession(s){const ok=!!s;show('authPanel',!ok);show('appPanel',ok);show('userArea',ok);if(ok){$('userEmail').textContent=s.user.email;await loadRows();}}
- async function login(){const email=$('email').value.trim(),password=$('password').value;if(!email||!password){msg('authMessage','Informe e-mail e senha.','error');return;}const {error}=await db.auth.signInWithPassword({email,password});if(error)msg('authMessage',error.message,'error');}
+ async function setSession(session){
+  const ok=!!session;
+  show('authPanel',!ok);show('appPanel',ok);show('userArea',ok);
+  if(ok){$('userEmail').textContent=session.user.email;await loadRows();}
+ }
+ async function login(){
+  const email=$('email').value.trim(),password=$('password').value;
+  if(!email||!password){msg('authMessage','Informe e-mail e senha.','error');return;}
+  if(!db){msg('authMessage','A conexão ainda não foi iniciada. Atualize a página.','error');return;}
+  msg('authMessage','Validando acesso...','muted');
+  try {
+   const {error}=await db.auth.signInWithPassword({email,password});
+   if(error){msg('authMessage','Não foi possível entrar: '+error.message,'error');return;}
+   msg('authMessage','Acesso confirmado. Carregando seus lançamentos...','success');
+  } catch(err) {
+   msg('authMessage','Falha de conexão: '+(err.message||String(err)),'error');
+  }
+ }
  $('loginBtn').onclick=login;
  $('logoutBtn').onclick=async()=>{await db.auth.signOut();};
  $('entryForm').onsubmit=async e=>{e.preventDefault();const t=$('tipo').value,sub=$('subtipo').value,record={data:$('data').value,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,saida:t==='saida'?(sub||'Saída'):null,entrada:t==='entrada'?(sub||'Entrada'):null,status:$('status').value};const id=$('editId').value;const result=id?await db.from('lancamentos').update({...record,atualizado_em:new Date().toISOString()}).eq('id',id):await db.from('lancamentos').insert(record);if(result.error){msg('formMessage',result.error.message,'error');return;}msg('formMessage','Lançamento salvo.','success');resetForm();await loadRows();};
  function resetForm(){$('entryForm').reset();$('editId').value='';$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);}
  $('cancelEditBtn').onclick=resetForm;
- function renderChart(rows){let inc=0,exp=0;rows.forEach(r=>{if(r.entrada)inc+=Number(r.valor);if(r.saida)exp+=Number(r.valor);});$('incomeTotal').textContent=money(inc);$('expenseTotal').textContent=money(exp);$('balanceTotal').textContent=money(inc-exp);if(chart)chart.destroy();chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels:['Receitas','Despesas'],datasets:[{label:'Total',data:[inc,exp]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});}
+ function renderChart(rows){
+  let inc=0,exp=0;rows.forEach(r=>{if(r.entrada)inc+=Number(r.valor);if(r.saida)exp+=Number(r.valor);});
+  $('incomeTotal').textContent=money(inc);$('expenseTotal').textContent=money(exp);$('balanceTotal').textContent=money(inc-exp);
+  if(typeof window.Chart==='undefined'){msg('dataMessage','Os dados foram carregados, mas a biblioteca do gráfico não respondeu. Os lançamentos continuam disponíveis.','error');return;}
+  if(chart)chart.destroy();
+  chart=new Chart($('chart').getContext('2d'),{type:'bar',data:{labels:['Receitas','Despesas'],datasets:[{label:'Total',data:[inc,exp]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+ }
  async function loadRows(){const range=monthRange($('monthFilter').value);let q=db.from('lancamentos').select('*').order('data',{ascending:false}).limit(1000);if(range)q=q.gte('data',range.start).lt('data',range.end);const{data,error}=await q;if(error){msg('dataMessage',error.message,'error');return;}currentRows=data||[];renderChart(currentRows);$('rows').innerHTML='';if(!currentRows.length){$('rows').innerHTML='<tr><td colspan="8">Nenhum lançamento neste mês.</td></tr>';return;}currentRows.forEach(r=>{const tr=document.createElement('tr'),vals=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status];vals.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});const td=document.createElement('td'),b=document.createElement('button');b.textContent='Editar';b.className='secondary';b.onclick=()=>editRow(r);td.appendChild(b);tr.appendChild(td);$('rows').appendChild(tr);});msg('dataMessage',currentRows.length+' lançamento(s) exibido(s).');}
  function editRow(r){$('editId').value=r.id;$('data').value=r.data;$('descricao').value=r.descricao;$('valor').value=r.valor;$('tipo').value=r.entrada?'entrada':'saida';$('categoria').value=r.categoria||'';$('metodo').value=r.metodo||'';$('parcela').value=r.parcela||'';$('status').value=r.status||'Pendente';$('subtipo').value=r.entrada?(r.entrada==='Entrada'?'':r.entrada):(r.saida==='Saída'?'':r.saida);$('formTitle').textContent='Editar lançamento';$('saveBtn').textContent='Salvar alterações';show('cancelEditBtn',true);window.scrollTo({top:0,behavior:'smooth'});}
  $('refreshBtn').onclick=loadRows;$('monthFilter').onchange=loadRows;
