@@ -33,7 +33,9 @@
       <div><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required></div>
       <div><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required></div>
       <div class="actions"><button id="loginBtn">Entrar</button></div>
-    </div><p id="authMessage" class="muted"></p>
+    </div>
+    <div class="actions" style="margin-top:12px"><button type="button" id="testConnectionBtn" class="secondary">Testar conexão</button></div>
+    <p id="authMessage" class="muted" role="status" aria-live="polite" style="min-height:24px;padding:10px;border-radius:8px;background:#eef4ef"></p>
   </section>
   <section id="appPanel" class="hidden">
     <section class="cards">
@@ -71,49 +73,75 @@
  function msg(id,t,c='muted'){ $(id).textContent=t;$(id).className=c; }
  function monthRange(v){if(!v)return null;const[y,m]=v.split('-').map(Number);return{start:y+'-'+String(m).padStart(2,'0')+'-01',end=(m===12?y+1:y)+'-'+String(m===12?1:m+1).padStart(2,'0')+'-01'};}
  async function init(){
+  msg('authMessage','Iniciando aplicativo e verificando conexão...','muted');
   try {
-   if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){msg('authMessage','Configuração do Supabase não encontrada. Confira o arquivo config.js.','error');return;}
-   if(!window.supabase || typeof window.supabase.createClient!=='function'){
-    msg('authMessage','A biblioteca de conexão do Supabase não carregou. Atualize a página e verifique sua internet ou bloqueadores do navegador.','error');return;
-   }
+   if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){msg('authMessage','ERRO: URL ou chave pública não encontrada no config.js.','error');return;}
+   if(!window.supabase||typeof window.supabase.createClient!=='function'){msg('authMessage','ERRO: biblioteca do Supabase não carregou. Confira a internet ou bloqueadores do navegador.','error');return;}
    db=window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
    const {data,error}=await db.auth.getSession();
-   if(error){msg('authMessage','Falha ao iniciar a autenticação: '+error.message,'error');return;}
-   await setSession(data.session);
-   // Não executar chamadas Supabase dentro do callback de autenticação:
-   // agenda a atualização da interface após o callback terminar.
+   if(error){msg('authMessage','ERRO ao consultar sessão: '+error.message,'error');return;}
+   if(data.session){await setSession(data.session);}
+   else{msg('authMessage','Conexão inicializada. Informe o e-mail e a senha e clique em Entrar.','success');}
    db.auth.onAuthStateChange((_event,session)=>{
-    setTimeout(()=>{setSession(session).catch(err=>msg('dataMessage','Erro ao carregar os lançamentos: '+err.message,'error'));},0);
+    setTimeout(()=>{
+     setSession(session).catch(err=>{
+      console.error('Falha ao atualizar tela:',err);
+      msg('dataMessage','Login reconhecido, mas ocorreu erro ao carregar os lançamentos: '+(err.message||String(err)),'error');
+     });
+    },0);
    });
   } catch(err) {
-   msg('authMessage','Não foi possível iniciar o aplicativo: '+(err.message||String(err)),'error');
+   console.error('Falha na inicialização:',err);
+   msg('authMessage','ERRO ao iniciar: '+(err.message||String(err)),'error');
   }
  }
  async function setSession(session){
-  const ok=!!session;
-  show('authPanel',!ok);show('appPanel',ok);show('userArea',ok);
-  if(ok){$('userEmail').textContent=session.user.email;await loadRows();}
+  const logged=!!session;
+  show('authPanel',!logged);show('appPanel',logged);show('userArea',logged);
+  if(logged){
+   $('userEmail').textContent=session.user.email||'Usuário conectado';
+   msg('dataMessage','Login realizado. Carregando lançamentos...','muted');
+   try { await loadRows(); }
+   catch(err){ console.error(err);msg('dataMessage','Você entrou, mas os lançamentos não carregaram: '+(err.message||String(err)),'error');}
+  }
  }
  async function login(){
   const email=$('email').value.trim(),password=$('password').value;
   if(!email||!password){msg('authMessage','Informe e-mail e senha.','error');return;}
-  if(!db){msg('authMessage','A conexão ainda não foi iniciada. Atualize a página.','error');return;}
-  msg('authMessage','Validando acesso...','muted');
+  if(!db){msg('authMessage','ERRO: a conexão ainda não foi inicializada. Recarregue a página.','error');return;}
   $('loginBtn').disabled=true;
+  msg('authMessage','Enviando credenciais ao Supabase...','muted');
   try {
    const {data,error}=await db.auth.signInWithPassword({email,password});
-   if(error){msg('authMessage','Não foi possível entrar: '+error.message,'error');return;}
-   if(!data || !data.session){msg('authMessage','O Supabase não retornou uma sessão. Verifique se o usuário confirmou o e-mail no painel Authentication > Users.','error');return;}
-   // Atualiza a interface com a sessão retornada pela própria chamada de login.
-   // Não depende apenas do evento onAuthStateChange do navegador.
+   if(error){console.error('Supabase login:',error);msg('authMessage','O Supabase recusou o login: '+error.message,'error');return;}
+   if(!data||!data.session){msg('authMessage','O Supabase não retornou uma sessão. Verifique se este e-mail existe no projeto e se a senha está correta.','error');return;}
+   msg('authMessage','Credenciais aceitas. Abrindo o painel...','success');
    await setSession(data.session);
-   msg('authMessage','Login realizado com sucesso.','success');
   } catch(err) {
-   msg('authMessage','Falha ao entrar: '+(err.message||String(err)),'error');
+   console.error('Erro no login:',err);
+   msg('authMessage','Falha técnica no login: '+(err.message||String(err)),'error');
   } finally {
    $('loginBtn').disabled=false;
   }
  }
+ async function testConnection(){
+  msg('authMessage','Testando comunicação com Supabase...','muted');
+  try{
+   if(!cfg.SUPABASE_URL||!cfg.SUPABASE_ANON_KEY){msg('authMessage','Configuração ausente: confira config.js.','error');return;}
+   const response=await fetch(cfg.SUPABASE_URL+'/auth/v1/settings',{headers:{apikey:cfg.SUPABASE_ANON_KEY}});
+   if(!response.ok){msg('authMessage','O servidor Supabase respondeu HTTP '+response.status+'. Verifique a URL e a chave pública em config.js.','error');return;}
+   msg('authMessage','Conexão com o Supabase OK. Agora tente entrar com seu e-mail e senha.','success');
+  }catch(err){
+   msg('authMessage','Não foi possível alcançar o Supabase: '+(err.message||String(err)),'error');
+  }
+ }
+ $('testConnectionBtn').onclick=testConnection;
+ window.addEventListener('error',event=>{
+  msg('authMessage','Erro no aplicativo: '+(event.message||'falha de JavaScript')+'. Atualize a página e tente novamente.','error');
+ });
+ window.addEventListener('unhandledrejection',event=>{
+  const reason=event.reason;msg('authMessage','Erro inesperado: '+(reason?.message||String(reason)),'error');
+ });
  $('loginBtn').onclick=login;
  $('logoutBtn').onclick=async()=>{await db.auth.signOut();};
  $('entryForm').onsubmit=async e=>{e.preventDefault();const t=$('tipo').value,sub=$('subtipo').value,record={data:$('data').value,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,saida:t==='saida'?(sub||'Saída'):null,entrada:t==='entrada'?(sub||'Entrada'):null,status:$('status').value};const id=$('editId').value;const result=id?await db.from('lancamentos').update({...record,atualizado_em:new Date().toISOString()}).eq('id',id):await db.from('lancamentos').insert(record);if(result.error){msg('formMessage',result.error.message,'error');return;}msg('formMessage','Lançamento salvo.','success');resetForm();await loadRows();};
