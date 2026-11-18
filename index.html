@@ -1,0 +1,178 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#176b50">
+  <title>Meu Controle Financeiro</title>
+  <link rel="manifest" href="manifest.json">
+  <style>
+    :root{--green:#176b50;--bg:#f4f7f5;--ink:#1d2923;--muted:#66736b;--line:#dce5df;--white:#fff;--red:#b42318}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px system-ui,-apple-system,Segoe UI,Roboto,sans-serif}
+    header{background:var(--green);color:white;padding:18px max(16px,calc((100% - 1120px)/2));display:flex;justify-content:space-between;align-items:center;gap:12px}
+    header h1{font-size:20px;margin:0}header small{opacity:.85}.wrap{max-width:1120px;margin:22px auto;padding:0 16px}
+    .panel{background:white;border:1px solid var(--line);border-radius:14px;padding:18px;margin-bottom:16px;box-shadow:0 2px 8px #173b2910}
+    .grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+    label{display:block;font-weight:600;font-size:13px;margin:0 0 6px}input,select,button{font:inherit}
+    input,select{width:100%;border:1px solid #cbd7cf;border-radius:9px;padding:10px;background:white;color:var(--ink);min-height:42px}
+    button{border:0;border-radius:9px;padding:10px 15px;background:var(--green);color:white;font-weight:650;cursor:pointer;min-height:42px}
+    button.secondary{background:#e8f1eb;color:var(--green)}button.danger{background:#fff0ef;color:var(--red)}button:disabled{opacity:.55;cursor:not-allowed}
+    .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.muted{color:var(--muted);font-size:13px}.hidden{display:none!important}
+    .metric{font-size:24px;font-weight:750;margin-top:5px}.metric-label{font-size:13px;color:var(--muted)}
+    .formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.field.full{grid-column:1/-1}
+    .tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted);font-weight:650}
+    .tag{display:inline-block;padding:3px 8px;border-radius:20px;background:#eef4ef;font-size:12px}
+    .topline{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.error{color:var(--red);white-space:pre-wrap}.success{color:var(--green)}
+    @media(max-width:760px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.cards{grid-template-columns:1fr}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{margin:12px auto}header{padding:15px 16px}}
+    @media(max-width:460px){.formgrid{grid-template-columns:1fr}.field.full{grid-column:auto}.metric{font-size:21px}}
+  </style>
+</head>
+<body>
+<header>
+  <div><h1>Meu Controle Financeiro</h1><small>Receitas, despesas e relatórios</small></div>
+  <div id="userArea" class="hidden"><small id="userEmail"></small> <button id="logoutBtn" class="secondary">Sair</button></div>
+</header>
+<main class="wrap">
+  <section id="authPanel" class="panel">
+    <h2>Acessar aplicativo</h2>
+    <p class="muted">Entre com seu e-mail e senha. Para criar um usuário, use “Criar conta”.</p>
+    <div class="formgrid">
+      <div class="field"><label for="email">E-mail</label><input id="email" type="email" autocomplete="username" required></div>
+      <div class="field"><label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" required></div>
+      <div class="field actions"><button id="loginBtn">Entrar</button><button id="signupBtn" class="secondary">Criar conta</button></div>
+    </div>
+    <p id="authMessage" class="muted"></p>
+  </section>
+
+  <section id="appPanel" class="hidden">
+    <section class="cards">
+      <div class="panel"><div class="metric-label">Receitas no período</div><div id="incomeTotal" class="metric">R$ 0,00</div></div>
+      <div class="panel"><div class="metric-label">Despesas no período</div><div id="expenseTotal" class="metric">R$ 0,00</div></div>
+      <div class="panel"><div class="metric-label">Saldo no período</div><div id="balanceTotal" class="metric">R$ 0,00</div></div>
+    </section>
+
+    <section class="panel">
+      <div class="topline"><h2 id="formTitle">Novo lançamento</h2><span class="muted">Campos com * são obrigatórios</span></div>
+      <form id="entryForm">
+        <input id="editId" type="hidden">
+        <div class="formgrid">
+          <div class="field"><label for="data">Data *</label><input id="data" type="date" required></div>
+          <div class="field"><label for="descricao">Descrição *</label><input id="descricao" maxlength="200" required placeholder="Ex.: supermercado"></div>
+          <div class="field"><label for="valor">Valor (R$) *</label><input id="valor" type="number" min="0.01" step="0.01" required placeholder="0,00"></div>
+          <div class="field"><label for="tipo">Tipo *</label><select id="tipo" required><option value="">Selecione</option><option value="saida">Saída</option><option value="entrada">Entrada</option></select></div>
+          <div class="field"><label for="categoria">Categoria</label><input id="categoria" list="categorias" placeholder="Selecione ou digite"><datalist id="categorias"><option>Alimentação</option><option>Casa</option><option>Vestuário</option><option>Entretenimento</option><option>Educação</option><option>Ferramentas</option><option>Investimento</option><option>Outros</option></datalist></div>
+          <div class="field"><label for="metodo">Método</label><input id="metodo" list="metodos" placeholder="Selecione ou digite"><datalist id="metodos"><option>Santander</option><option>Nomad</option><option>XP</option><option>Bradesco</option><option>Inter</option><option>Mercado Pago</option><option>Espécie</option><option>C6</option><option>Porto</option></datalist></div>
+          <div class="field"><label for="parcela">Parcela</label><input id="parcela" placeholder="Ex.: 1/3"></div>
+          <div class="field"><label for="status">Status</label><select id="status"><option>Pago</option><option selected>Pendente</option><option>Atrasado</option></select></div>
+          <div class="field"><label for="subtipo">Classificação</label><select id="subtipo"><option value="">Não se aplica</option><option value="fixos">Fixos</option><option value="cartao de credito">Cartão de crédito</option><option value="boletos">Boletos</option><option value="dinheiro">Dinheiro</option><option value="recebidos">Recebidos</option><option value="pagamentos">Pagamentos</option><option value="extra">Extra</option></select></div>
+        </div>
+        <div class="actions" style="margin-top:14px"><button type="submit" id="saveBtn">Salvar lançamento</button><button type="button" id="cancelEditBtn" class="secondary hidden">Cancelar edição</button><span id="formMessage" class="muted"></span></div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="topline"><h2>Relatórios e lançamentos</h2><div class="actions">
+        <div><label for="monthFilter">Mês</label><input id="monthFilter" type="month" value="2026-11"></div>
+        <button id="refreshBtn" class="secondary">Atualizar</button>
+        <button id="csvBtn" class="secondary">Exportar CSV</button>
+      </div></div>
+      <div style="height:230px;margin:12px 0"><canvas id="chart"></canvas></div>
+      <div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="8">Carregando...</td></tr></tbody></table></div>
+      <p id="dataMessage" class="muted"></p>
+    </section>
+  </section>
+</main>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="config.js"></script>
+<script>
+(() => {
+  const $ = id => document.getElementById(id);
+  const money = n => new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(Number(n||0));
+  const cfg = window.APP_CONFIG || {};
+  let supabaseClient, chart, currentRows = [];
+  const show = (id, yes) => $(id).classList.toggle('hidden', !yes);
+  function message(id, text, cls='muted'){ $(id).textContent=text; $(id).className=cls; }
+  function monthRange(v){ if(!v) return null; const [y,m]=v.split('-').map(Number); return {start:`${y}-${String(m).padStart(2,'0')}-01`,end:`${y}-${String(m+1).padStart(2,'0')}-01`}; }
+  async function init(){
+    if(!cfg.SUPABASE_URL || !cfg.SUPABASE_ANON_KEY || cfg.SUPABASE_URL.includes('COLE_')){
+      message('authMessage','Configure o arquivo config.js com a URL do projeto e a chave publishable/anon do Supabase. Não use service_role.','error'); return;
+    }
+    supabaseClient = window.supabase.createClient(cfg.SUPABASE_URL,cfg.SUPABASE_ANON_KEY);
+    const {data:{session}} = await supabaseClient.auth.getSession();
+    await setSession(session);
+    supabaseClient.auth.onAuthStateChange((_event,session)=>setSession(session));
+  }
+  async function setSession(session){
+    const logged=!!session;
+    show('authPanel',!logged); show('appPanel',logged); show('userArea',logged);
+    if(logged){ $('userEmail').textContent=session.user.email; await loadRows(); }
+  }
+  async function auth(action){
+    const email=$('email').value.trim(), password=$('password').value;
+    if(!email||!password){message('authMessage','Informe e-mail e senha.','error');return;}
+    const result=action==='login'
+      ? await supabaseClient.auth.signInWithPassword({email,password})
+      : await supabaseClient.auth.signUp({email,password});
+    if(result.error) message('authMessage',result.error.message,'error');
+    else message('authMessage',action==='login'?'Acesso realizado.': 'Conta criada. Se a confirmação de e-mail estiver ativa, confirme pelo e-mail antes de entrar.','success');
+  }
+  $('loginBtn').onclick=()=>auth('login');
+  $('signupBtn').onclick=()=>auth('signup');
+  $('logoutBtn').onclick=async()=>{await supabaseClient.auth.signOut();};
+  $('entryForm').onsubmit=async e=>{
+    e.preventDefault();
+    const tipo=$('tipo').value, sub=$('subtipo').value;
+    const record={data:$('data').value,descricao:$('descricao').value.trim(),valor:Number($('valor').value),
+      parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,
+      saida:tipo==='saida'?(sub||'Saída'):null,entrada:tipo==='entrada'?(sub||'Entrada'):null,status:$('status').value};
+    const id=$('editId').value;
+    const result=id ? await supabaseClient.from('lancamentos').update({...record,atualizado_em:new Date().toISOString()}).eq('id',id)
+                    : await supabaseClient.from('lancamentos').insert(record);
+    if(result.error){message('formMessage',result.error.message,'error');return;}
+    message('formMessage','Lançamento salvo com sucesso.','success'); resetForm(); await loadRows();
+  };
+  function resetForm(){ $('entryForm').reset(); $('editId').value=''; $('formTitle').textContent='Novo lançamento'; $('saveBtn').textContent='Salvar lançamento'; show('cancelEditBtn',false); }
+  $('cancelEditBtn').onclick=resetForm;
+  function renderChart(rows){
+    let income=0,expense=0; rows.forEach(r=>{if(r.entrada) income+=Number(r.valor); if(r.saida) expense+=Number(r.valor);});
+    $('incomeTotal').textContent=money(income); $('expenseTotal').textContent=money(expense); $('balanceTotal').textContent=money(income-expense);
+    const ctx=$('chart').getContext('2d'); if(chart) chart.destroy();
+    chart=new Chart(ctx,{type:'bar',data:{labels:['Receitas','Despesas'],datasets:[{label:'Total',data:[income,expense]}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}}}});
+  }
+  async function loadRows(){
+    const range=monthRange($('monthFilter').value);
+    let q=supabaseClient.from('lancamentos').select('*').order('data',{ascending:false}).limit(1000);
+    if(range) q=q.gte('data',range.start).lt('data',range.end);
+    const {data,error}=await q;
+    if(error){message('dataMessage',error.message,'error');return;}
+    currentRows=data||[]; renderChart(currentRows);
+    $('rows').innerHTML='';
+    if(!currentRows.length){$('rows').innerHTML='<tr><td colspan="8">Nenhum lançamento neste mês.</td></tr>';return;}
+    currentRows.forEach(r=>{
+      const tr=document.createElement('tr');
+      const vals=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status];
+      vals.forEach(v=>{const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
+      const td=document.createElement('td'),b=document.createElement('button');b.textContent='Editar';b.className='secondary';b.onclick=()=>editRow(r);td.appendChild(b);tr.appendChild(td);$('rows').appendChild(tr);
+    });
+    message('dataMessage',`${currentRows.length} lançamento(s) exibido(s). O aplicativo mostra até 1.000 registros por consulta.`);
+  }
+  function editRow(r){
+    $('editId').value=r.id; $('data').value=r.data; $('descricao').value=r.descricao; $('valor').value=r.valor;
+    $('tipo').value=r.entrada?'entrada':'saida'; $('categoria').value=r.categoria||''; $('metodo').value=r.metodo||'';
+    $('parcela').value=r.parcela||''; $('status').value=r.status||'Pendente'; $('subtipo').value=r.entrada?(r.entrada==='Entrada'?'':r.entrada):(r.saida==='Saída'?'':r.saida);
+    $('formTitle').textContent='Editar lançamento'; $('saveBtn').textContent='Salvar alterações'; show('cancelEditBtn',true);
+    window.scrollTo({top:0,behavior:'smooth'});
+  }
+  $('refreshBtn').onclick=loadRows; $('monthFilter').onchange=loadRows;
+  $('csvBtn').onclick=()=>{
+    const headers=['data','descricao','tipo','valor','categoria','metodo','status','parcela'];
+    const lines=[headers.join(';'),...currentRows.map(r=>[r.data,r.descricao,r.entrada?'Entrada':'Saída',r.valor,r.categoria||'',r.metodo||'',r.status,r.parcela||''].map(v=>`"${String(v??'').replaceAll('"','""')}"`).join(';'))];
+    const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'}),url=URL.createObjectURL(blob),a=document.createElement('a');
+    a.href=url;a.download='lancamentos_'+$('monthFilter').value+'.csv';a.click();URL.revokeObjectURL(url);
+  };
+  init();
+  if('serviceWorker' in navigator) window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));
+})();
+</script>
+</body></html>
