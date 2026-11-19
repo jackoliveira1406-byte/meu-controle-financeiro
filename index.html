@@ -109,7 +109,7 @@ try {
      <button id="clearSelectionBtn" type="button" class="secondary" disabled>Limpar seleção</button>
     </div>
    </div>
-   <div class="tablewrap"><table><thead><tr><th><input id="selectAllRows" class="selection-check" type="checkbox" aria-label="Selecionar todos os lançamentos exibidos"></th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="9">Nenhum lançamento carregado.</td></tr></tbody></table></div>
+   <div class="tablewrap"><table><thead><tr><th><input id="selectAllRows" class="selection-check" type="checkbox" aria-label="Selecionar todos os lançamentos exibidos"></th><th>Data</th><th>Descrição</th><th>Parcela</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="10">Nenhum lançamento carregado.</td></tr></tbody></table></div>
    <p id="dataMessage" class="muted"></p>
   </section>
  </section>
@@ -272,7 +272,7 @@ try {
   const body=$('rows');body.innerHTML='';
   const rows=visibleRows();
   if(!rows.length){
-   body.innerHTML='<tr><td colspan="9">Nenhum lançamento corresponde aos filtros.</td></tr>';
+   body.innerHTML='<tr><td colspan="10">Nenhum lançamento corresponde aos filtros.</td></tr>';
    msg('dataMessage','0 lançamento(s) encontrados de '+currentRows.length+' no mês selecionado.','muted');
    refreshSelectionUI(rows);return;
   }
@@ -282,7 +282,7 @@ try {
    check.type='checkbox';check.className='selection-check';check.checked=selectedIds.has(String(r.id));check.setAttribute('aria-label','Selecionar '+(r.descricao||'lançamento'));
    check.addEventListener('change',function(){if(check.checked)selectedIds.add(String(r.id));else selectedIds.delete(String(r.id));refreshSelectionUI(rows);});
    checkCell.appendChild(check);tr.appendChild(checkCell);
-   const values=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
+   const values=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.parcela||'—',r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
    values.forEach(function(v){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
    const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.className='secondary';btn.onclick=function(){editRow(r);};td.appendChild(btn);tr.appendChild(td);body.appendChild(tr);
   });
