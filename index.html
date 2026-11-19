@@ -23,6 +23,7 @@ button.secondary{background:#e8f1eb;color:var(--green)}button:disabled{opacity:.
 .topline{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.error{color:var(--red);white-space:pre-wrap}.success{color:var(--green)}
 .chart{display:flex;align-items:end;justify-content:space-between;gap:8px;height:190px;padding:12px 8px;border-bottom:1px solid var(--line)}
 .chart-col{height:100%;display:flex;flex:1 1 0;flex-direction:column;justify-content:end;align-items:center;gap:8px;min-width:0}
+.chart-col.status-start{border-left:2px solid var(--line);padding-left:10px;margin-left:6px}
 .bar-track{height:125px;width:44px;max-width:100%;background:#edf2ef;border-radius:8px;display:flex;align-items:end;overflow:hidden}
 .bar{width:100%;height:0;border-radius:8px 8px 0 0;background:var(--green);transition:height .25s}
 .bar.expense{background:#bd7a43}.bar.balance{background:#5478a7}.bar.negative{background:var(--red)}.bar.paid{background:#31845b}.bar.pending{background:#d69b2d}.bar.overdue{background:#c04444}
@@ -96,7 +97,7 @@ try {
       <div class="chart-col"><div id="incomeValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="incomeBar" class="bar"></div></div><div class="bar-label">Entradas</div></div>
       <div class="chart-col"><div id="expenseValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="expenseBar" class="bar expense"></div></div><div class="bar-label">Saídas</div></div>
       <div class="chart-col"><div id="balanceValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="balanceBar" class="bar balance"></div></div><div class="bar-label">Saldo</div></div>
-      <div class="chart-col"><div id="paidValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="paidBar" class="bar paid"></div></div><div class="bar-label">Pago</div></div>
+      <div class="chart-col status-start"><div id="paidValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="paidBar" class="bar paid"></div></div><div class="bar-label">Pago</div></div>
       <div class="chart-col"><div id="pendingValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="pendingBar" class="bar pending"></div></div><div class="bar-label">Pendente</div></div>
       <div class="chart-col"><div id="overdueValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="overdueBar" class="bar overdue"></div></div><div class="bar-label">Atrasado</div></div>
      </div>
