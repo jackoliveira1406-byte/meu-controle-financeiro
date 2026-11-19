@@ -19,16 +19,22 @@ button.secondary{background:#e8f1eb;color:var(--green)}button:disabled{opacity:.
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.muted{color:var(--muted);font-size:13px}.hidden{display:none!important}
 .formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .metric{font-size:24px;font-weight:750;margin-top:5px}.metric-label{font-size:13px;color:var(--muted)}
-.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:760px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
+.tablewrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:900px}th,td{text-align:left;padding:10px;border-bottom:1px solid var(--line);font-size:13px}th{color:var(--muted)}
 .topline{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.error{color:var(--red);white-space:pre-wrap}.success{color:var(--green)}
-.chart{display:flex;align-items:end;justify-content:center;gap:36px;height:190px;padding:12px 20px;border-bottom:1px solid var(--line)}
-.chart-col{height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:8px;min-width:110px}
+.chart{display:flex;align-items:end;justify-content:center;gap:28px;height:190px;padding:12px 20px;border-bottom:1px solid var(--line)}
+.chart-col{height:100%;display:flex;flex-direction:column;justify-content:end;align-items:center;gap:8px;min-width:100px}
 .bar-track{height:125px;width:54px;background:#edf2ef;border-radius:8px;display:flex;align-items:end;overflow:hidden}
 .bar{width:100%;height:0;border-radius:8px 8px 0 0;background:var(--green);transition:height .25s}
-.bar.expense{background:#bd7a43}.bar-value{font-size:12px;font-weight:700}.bar-label{font-size:13px;color:var(--muted)}
+.bar.expense{background:#bd7a43}.bar.balance{background:#5478a7}.bar.negative{background:var(--red)}
+.bar-value{font-size:12px;font-weight:700;text-align:center}.bar-label{font-size:13px;color:var(--muted);text-align:center}
+.filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0}
+.value-range{display:grid;grid-template-columns:1fr 1fr;gap:6px}.value-range input{min-width:0}
+.bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;background:#f4f7f5;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
+.selection-check{width:18px;height:18px;min-height:18px;vertical-align:middle;accent-color:var(--green);cursor:pointer}
 #authMessage{min-height:22px;padding:10px;border-radius:8px;background:#eef4ef;margin-top:12px}
-@media(max-width:760px){.cards{grid-template-columns:1fr}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{margin:12px auto}header{padding:15px 16px}}
-@media(max-width:460px){.formgrid{grid-template-columns:1fr}.metric{font-size:21px}.chart{gap:20px}}
+@media(max-width:900px){.filters{grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.cards{grid-template-columns:1fr}.formgrid{grid-template-columns:repeat(2,minmax(0,1fr))}.wrap{margin:12px auto}header{padding:15px 16px}.filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:460px){.formgrid{grid-template-columns:1fr}.metric{font-size:21px}.chart{gap:10px;padding:12px 4px}.chart-col{min-width:88px}.bar-track{width:44px}.filters{grid-template-columns:1fr}.bulk-toolbar{align-items:stretch}.bulk-toolbar .actions{width:100%}.bulk-toolbar .actions select,.bulk-toolbar .actions button{flex:1}}
 </style>
 <script>
 /* Remove versões antigas do service worker/cache para evitar servir JavaScript desatualizado. */
@@ -83,10 +89,27 @@ try {
   <section class="panel">
    <div class="topline"><h2>Relatórios e lançamentos</h2><div class="actions"><div><label for="monthFilter">Mês</label><input id="monthFilter" type="month" value="2026-11"></div><button id="refreshBtn" type="button" class="secondary">Atualizar</button><button id="csvBtn" type="button" class="secondary">Exportar CSV</button></div></div>
    <div class="chart">
-    <div class="chart-col"><div id="incomeValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="incomeBar" class="bar"></div></div><div class="bar-label">Receitas</div></div>
-    <div class="chart-col"><div id="expenseValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="expenseBar" class="bar expense"></div></div><div class="bar-label">Despesas</div></div>
+    <div class="chart-col"><div id="incomeValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="incomeBar" class="bar"></div></div><div class="bar-label">Entradas</div></div>
+    <div class="chart-col"><div id="expenseValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="expenseBar" class="bar expense"></div></div><div class="bar-label">Saídas</div></div>
+    <div class="chart-col"><div id="balanceValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="balanceBar" class="bar balance"></div></div><div class="bar-label">Saldo do mês</div></div>
    </div>
-   <div class="tablewrap"><table><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="8">Nenhum lançamento carregado.</td></tr></tbody></table></div>
+   <div class="filters" aria-label="Filtros dos lançamentos">
+    <div><label for="typeFilter">Tipo</label><select id="typeFilter"><option value="">Todos</option><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
+    <div><label>Valor (R$)</label><div class="value-range"><input id="valueMinFilter" type="number" min="0" step="0.01" placeholder="De" aria-label="Valor mínimo"><input id="valueMaxFilter" type="number" min="0" step="0.01" placeholder="Até" aria-label="Valor máximo"></div></div>
+    <div><label for="categoryFilter">Categoria</label><select id="categoryFilter"><option value="">Todas</option></select></div>
+    <div><label for="methodFilter">Método</label><select id="methodFilter"><option value="">Todos</option></select></div>
+    <div><label for="statusFilter">Status</label><select id="statusFilter"><option value="">Todos</option><option>Pago</option><option>Pendente</option><option>Atrasado</option></select></div>
+   </div>
+   <div class="actions" style="margin:-5px 0 14px"><button id="clearFiltersBtn" type="button" class="secondary">Limpar filtros</button></div>
+   <div class="bulk-toolbar">
+    <span id="selectionInfo" class="muted">Nenhum lançamento selecionado</span>
+    <div class="actions">
+     <div><label for="bulkStatus">Novo status</label><select id="bulkStatus"><option value="">Selecione...</option><option>Pago</option><option>Pendente</option><option>Atrasado</option></select></div>
+     <button id="bulkStatusBtn" type="button" disabled>Alterar status selecionados</button>
+     <button id="clearSelectionBtn" type="button" class="secondary" disabled>Limpar seleção</button>
+    </div>
+   </div>
+   <div class="tablewrap"><table><thead><tr><th><input id="selectAllRows" class="selection-check" type="checkbox" aria-label="Selecionar todos os lançamentos exibidos"></th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="9">Nenhum lançamento carregado.</td></tr></tbody></table></div>
    <p id="dataMessage" class="muted"></p>
   </section>
  </section>
@@ -100,6 +123,7 @@ try {
  const API=(cfg.SUPABASE_URL||'').replace(/\/+$/,'');
  const SESSION_KEY='financeiro_supabase_session_v1';
  let session=null,currentRows=[];
+ const selectedIds=new Set();
  function show(id,yes){$(id).classList.toggle('hidden',!yes);}
  function msg(id,text,kind){const el=$(id);el.textContent=text;el.className=kind||'muted';}
  function readSession(){try{return JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(e){return null;}}
@@ -190,27 +214,106 @@ try {
   if(range){params.append('data','gte.'+range.start);params.append('data','lt.'+range.end);}
   const data=await api('/rest/v1/lancamentos?'+params.toString(),{token:token});
   currentRows=Array.isArray(data)?data:[];
+  populateFilterOptions('categoryFilter',currentRows.map(function(r){return r.categoria;}),'Todas');
+  populateFilterOptions('methodFilter',currentRows.map(function(r){return r.metodo;}),'Todos');
   renderRows();renderSummary();
  }
  function renderSummary(){
   let income=0,expense=0;
   currentRows.forEach(function(r){if(r.entrada)income+=Number(r.valor);if(r.saida)expense+=Number(r.valor);});
-  $('incomeTotal').textContent=money(income);$('expenseTotal').textContent=money(expense);$('balanceTotal').textContent=money(income-expense);
-  $('incomeValue').textContent=money(income);$('expenseValue').textContent=money(expense);
-  const max=Math.max(income,expense,1);
-  $('incomeBar').style.height=(income/max*100)+'%';$('expenseBar').style.height=(expense/max*100)+'%';
+  const balance=income-expense;
+  $('incomeTotal').textContent=money(income);$('expenseTotal').textContent=money(expense);$('balanceTotal').textContent=money(balance);
+  $('incomeValue').textContent=money(income);$('expenseValue').textContent=money(expense);$('balanceValue').textContent=money(balance);
+  const max=Math.max(income,expense,Math.abs(balance),1);
+  $('incomeBar').style.height=(income/max*100)+'%';
+  $('expenseBar').style.height=(expense/max*100)+'%';
+  $('balanceBar').style.height=(Math.abs(balance)/max*100)+'%';
+  $('balanceBar').classList.toggle('negative',balance<0);
+  $('balanceValue').title=balance<0?'As despesas superaram as receitas neste mês':'As receitas superaram ou igualaram as despesas neste mês';
+ }
+ function populateFilterOptions(selectId,values,defaultLabel){
+  const select=$(selectId),previous=select.value;
+  select.innerHTML='';
+  const first=document.createElement('option');first.value='';first.textContent=defaultLabel;select.appendChild(first);
+  Array.from(new Set(values.filter(function(v){return v!==null&&v!==undefined&&String(v).trim()!=='';}).map(function(v){return String(v).trim();})))
+   .sort(function(a,b){return a.localeCompare(b,'pt-BR');})
+   .forEach(function(value){const option=document.createElement('option');option.value=value;option.textContent=value;select.appendChild(option);});
+  if(Array.from(select.options).some(function(o){return o.value===previous;}))select.value=previous;
+ }
+ function visibleRows(){
+  const type=$('typeFilter').value,category=$('categoryFilter').value,method=$('methodFilter').value,status=$('statusFilter').value;
+  const minText=$('valueMinFilter').value,maxText=$('valueMaxFilter').value;
+  const min=minText===''?null:Number(minText),max=maxText===''?null:Number(maxText);
+  return currentRows.filter(function(r){
+   const rowType=r.entrada?'entrada':'saida';
+   const value=Number(r.valor||0),rowStatus=r.status||'Pendente';
+   if(type&&rowType!==type)return false;
+   if(category&&(r.categoria||'')!==category)return false;
+   if(method&&(r.metodo||'')!==method)return false;
+   if(status&&rowStatus!==status)return false;
+   if(min!==null&&value<min)return false;
+   if(max!==null&&value>max)return false;
+   return true;
+  });
+ }
+ function refreshSelectionUI(rows){
+  const count=selectedIds.size;
+  $('selectionInfo').textContent=count===0?'Nenhum lançamento selecionado':count+' lançamento(s) selecionado(s)';
+  $('bulkStatusBtn').disabled=count===0||!$('bulkStatus').value;
+  $('clearSelectionBtn').disabled=count===0;
+  const selectAll=$('selectAllRows');
+  const visibleIds=rows.map(function(r){return String(r.id);});
+  const selectedVisible=visibleIds.filter(function(id){return selectedIds.has(id);}).length;
+  selectAll.checked=visibleIds.length>0&&selectedVisible===visibleIds.length;
+  selectAll.indeterminate=selectedVisible>0&&selectedVisible<visibleIds.length;
  }
  function renderRows(){
   const body=$('rows');body.innerHTML='';
-  if(!currentRows.length){body.innerHTML='<tr><td colspan="8">Nenhum lançamento neste mês.</td></tr>';msg('dataMessage','Nenhum registro encontrado para o mês selecionado.','muted');return;}
-  currentRows.forEach(function(r){
+  const rows=visibleRows();
+  if(!rows.length){
+   body.innerHTML='<tr><td colspan="9">Nenhum lançamento corresponde aos filtros.</td></tr>';
+   msg('dataMessage','0 lançamento(s) encontrados de '+currentRows.length+' no mês selecionado.','muted');
+   refreshSelectionUI(rows);return;
+  }
+  rows.forEach(function(r){
    const tr=document.createElement('tr');
+   const checkCell=document.createElement('td'),check=document.createElement('input');
+   check.type='checkbox';check.className='selection-check';check.checked=selectedIds.has(String(r.id));check.setAttribute('aria-label','Selecionar '+(r.descricao||'lançamento'));
+   check.addEventListener('change',function(){if(check.checked)selectedIds.add(String(r.id));else selectedIds.delete(String(r.id));refreshSelectionUI(rows);});
+   checkCell.appendChild(check);tr.appendChild(checkCell);
    const values=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
    values.forEach(function(v){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
    const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.className='secondary';btn.onclick=function(){editRow(r);};td.appendChild(btn);tr.appendChild(td);body.appendChild(tr);
   });
-  msg('dataMessage',currentRows.length+' lançamento(s) exibido(s).','muted');
+  msg('dataMessage',rows.length+' lançamento(s) exibido(s) de '+currentRows.length+' no mês selecionado.','muted');
+  refreshSelectionUI(rows);
  }
+ async function bulkUpdateStatus(){
+  const ids=Array.from(selectedIds),newStatus=$('bulkStatus').value;
+  if(!ids.length){msg('dataMessage','Selecione pelo menos um lançamento.','error');return;}
+  if(!newStatus){msg('dataMessage','Escolha o novo status antes de continuar.','error');return;}
+  if(!window.confirm('Alterar o status de '+ids.length+' lançamento(s) para "'+newStatus+'"?'))return;
+  $('bulkStatusBtn').disabled=true;
+  try{
+   const token=await ensureSession();
+   const query=new URLSearchParams();
+   query.set('id','in.('+ids.join(',')+')');
+   await api('/rest/v1/lancamentos?'+query.toString(),{method:'PATCH',token:token,body:{status:newStatus,atualizado_em:new Date().toISOString()},prefer:'return=minimal'});
+   selectedIds.clear();$('bulkStatus').value='';
+   await loadRows();
+   msg('dataMessage','Status atualizado para '+newStatus+' em '+ids.length+' lançamento(s).','success');
+  }catch(error){
+   msg('dataMessage','Não foi possível alterar os status: '+error.message,'error');
+  }finally{
+   renderRows();
+  }
+ }
+ function clearFilters(){
+  $('typeFilter').value='';$('valueMinFilter').value='';$('valueMaxFilter').value='';
+  $('categoryFilter').value='';$('methodFilter').value='';$('statusFilter').value='';
+  selectedIds.clear();renderRows();
+ }
+ function clearSelection(){selectedIds.clear();$('bulkStatus').value='';renderRows();}
  async function saveRecord(event){
   event.preventDefault();
   const type=$('tipo').value,sub=$('subtipo').value;
@@ -251,8 +354,21 @@ try {
  $('logoutBtn').addEventListener('click',logout);
  $('entryForm').addEventListener('submit',saveRecord);
  $('cancelEditBtn').addEventListener('click',resetForm);
- $('refreshBtn').addEventListener('click',function(){loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
- $('monthFilter').addEventListener('change',function(){loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
+ $('refreshBtn').addEventListener('click',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
+ $('monthFilter').addEventListener('change',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
+ ['typeFilter','categoryFilter','methodFilter','statusFilter','valueMinFilter','valueMaxFilter'].forEach(function(id){
+  $(id).addEventListener('input',function(){selectedIds.clear();renderRows();});
+  $(id).addEventListener('change',function(){selectedIds.clear();renderRows();});
+ });
+ $('clearFiltersBtn').addEventListener('click',clearFilters);
+ $('selectAllRows').addEventListener('change',function(){
+  const rows=visibleRows();
+  rows.forEach(function(r){if($('selectAllRows').checked)selectedIds.add(String(r.id));else selectedIds.delete(String(r.id));});
+  renderRows();
+ });
+ $('bulkStatus').addEventListener('change',function(){refreshSelectionUI(visibleRows());});
+ $('bulkStatusBtn').addEventListener('click',bulkUpdateStatus);
+ $('clearSelectionBtn').addEventListener('click',clearSelection);
  $('csvBtn').addEventListener('click',exportCsv);
  window.addEventListener('error',function(e){msg('authMessage','Erro no aplicativo: '+(e.message||'falha de JavaScript'),'error');});
  init();
