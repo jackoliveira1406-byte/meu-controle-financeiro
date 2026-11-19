@@ -27,7 +27,7 @@ button.secondary{background:#e8f1eb;color:var(--green)}button:disabled{opacity:.
 .bar{width:100%;height:0;border-radius:8px 8px 0 0;background:var(--green);transition:height .25s}
 .bar.expense{background:#bd7a43}.bar.balance{background:#5478a7}.bar.negative{background:var(--red)}
 .bar-value{font-size:12px;font-weight:700;text-align:center}.bar-label{font-size:13px;color:var(--muted);text-align:center}
-.analytics-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:16px;align-items:stretch;margin:12px 0 16px}.analytics-chart{min-width:0}.method-breakdown{border:1px solid var(--line);border-radius:12px;background:#fbfdfb;padding:12px;min-width:0}.method-breakdown h3{font-size:15px;margin:0 0 8px}.method-table{min-width:0;width:100%;table-layout:fixed}.method-table th,.method-table td{padding:9px 6px}.method-table th:last-child,.method-table td:last-child{text-align:right;white-space:nowrap}.method-table td:first-child{overflow-wrap:anywhere}.method-total td{font-weight:750;border-top:1px solid var(--line)}.chart-note{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.analytics-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:16px;align-items:stretch;margin:12px 0 16px}.analytics-chart{min-width:0}.method-breakdown{border:1px solid var(--line);border-radius:12px;background:#fbfdfb;padding:12px;min-width:0}.method-breakdown h3{font-size:15px;margin:0 0 8px}.method-table{min-width:330px;width:100%;table-layout:fixed}.method-table th,.method-table td{padding:9px 6px}.method-table th:not(:first-child),.method-table td:not(:first-child){text-align:right;white-space:nowrap}.method-table td:first-child{overflow-wrap:anywhere}.method-total td{font-weight:750;border-top:1px solid var(--line)}.chart-note{margin:8px 0 0;font-size:12px;color:var(--muted)}
 .filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0}
 .value-range{display:grid;grid-template-columns:1fr 1fr;gap:6px}.value-range input{min-width:0}
 .bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;background:#f4f7f5;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
@@ -100,8 +100,8 @@ try {
      <p class="chart-note">Gráfico e totais atualizados conforme os filtros selecionados.</p>
     </div>
     <aside class="method-breakdown" aria-labelledby="methodBreakdownTitle">
-     <h3 id="methodBreakdownTitle">Total por método</h3>
-     <div class="tablewrap"><table class="method-table"><thead><tr><th>Método</th><th>Valor total</th></tr></thead><tbody id="methodRows"><tr><td colspan="2">Nenhum lançamento.</td></tr></tbody><tfoot><tr class="method-total"><td>Total</td><td id="methodGrandTotal">R$ 0,00</td></tr></tfoot></table></div>
+     <h3 id="methodBreakdownTitle">Entradas e saídas por método</h3>
+     <div class="tablewrap"><table class="method-table"><thead><tr><th>Método</th><th>Entradas</th><th>Saídas</th></tr></thead><tbody id="methodRows"><tr><td colspan="3">Nenhum lançamento.</td></tr></tbody><tfoot><tr class="method-total"><td>Total</td><td id="methodIncomeTotal">R$ 0,00</td><td id="methodExpenseTotal">R$ 0,00</td></tr></tfoot></table></div>
     </aside>
    </div>
    <div class="filters" aria-label="Filtros dos lançamentos">
@@ -231,15 +231,15 @@ try {
  }
  function renderSummary(rows){
   rows=Array.isArray(rows)?rows:visibleRows();
-  let income=0,expense=0,totalByMethod=0;
+  let income=0,expense=0;
   const methodTotals=new Map();
   rows.forEach(function(r){
    const value=Number(r.valor||0);
-   if(r.entrada)income+=value;
-   if(r.saida)expense+=value;
    const method=String(r.metodo||'').trim()||'Não informado';
-   methodTotals.set(method,(methodTotals.get(method)||0)+value);
-   totalByMethod+=value;
+   if(!methodTotals.has(method))methodTotals.set(method,{income:0,expense:0});
+   const totals=methodTotals.get(method);
+   if(r.entrada){income+=value;totals.income+=value;}
+   if(r.saida){expense+=value;totals.expense+=value;}
   });
   const balance=income-expense;
   $('incomeTotal').textContent=money(income);$('expenseTotal').textContent=money(expense);$('balanceTotal').textContent=money(balance);
@@ -252,19 +252,24 @@ try {
   $('balanceValue').title=balance<0?'As despesas superaram as receitas nos lançamentos filtrados':'As receitas superaram ou igualaram as despesas nos lançamentos filtrados';
   const methodBody=$('methodRows');
   methodBody.innerHTML='';
-  const methods=Array.from(methodTotals.entries()).sort(function(a,b){return b[1]-a[1]||a[0].localeCompare(b[0],'pt-BR');});
+  const methods=Array.from(methodTotals.entries()).sort(function(a,b){
+   const totalA=a[1].income+a[1].expense,totalB=b[1].income+b[1].expense;
+   return totalB-totalA||a[0].localeCompare(b[0],'pt-BR');
+  });
   if(!methods.length){
    const tr=document.createElement('tr'),td=document.createElement('td');
-   td.colSpan=2;td.textContent='Nenhum lançamento para os filtros selecionados.';
+   td.colSpan=3;td.textContent='Nenhum lançamento para os filtros selecionados.';
    tr.appendChild(td);methodBody.appendChild(tr);
   }else{
    methods.forEach(function(item){
-    const tr=document.createElement('tr'),name=document.createElement('td'),amount=document.createElement('td');
-    name.textContent=item[0];amount.textContent=money(item[1]);
-    tr.appendChild(name);tr.appendChild(amount);methodBody.appendChild(tr);
+    const tr=document.createElement('tr');
+    const name=document.createElement('td'),incomeCell=document.createElement('td'),expenseCell=document.createElement('td');
+    name.textContent=item[0];incomeCell.textContent=money(item[1].income);expenseCell.textContent=money(item[1].expense);
+    tr.appendChild(name);tr.appendChild(incomeCell);tr.appendChild(expenseCell);methodBody.appendChild(tr);
    });
   }
-  $('methodGrandTotal').textContent=money(totalByMethod);
+  $('methodIncomeTotal').textContent=money(income);
+  $('methodExpenseTotal').textContent=money(expense);
  }
  function populateFilterOptions(selectId,values,defaultLabel){
   const select=$(selectId),previous=select.value;
