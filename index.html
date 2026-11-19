@@ -211,7 +211,7 @@ try {
   const token=await ensureSession();
   const range=monthRange($('monthFilter').value);
   const params=new URLSearchParams({select:'*',order:'data.desc',limit:'1000'});
-  if(range){params.append('data','gte.'+range.start);params.append('data','lt.'+range.end);}
+  if(range){params.set('and','(data.gte.'+range.start+',data.lt.'+range.end+')');}
   const data=await api('/rest/v1/lancamentos?'+params.toString(),{token:token});
   currentRows=Array.isArray(data)?data:[];
   populateFilterOptions('categoryFilter',currentRows.map(function(r){return r.categoria;}),'Todas');
@@ -246,11 +246,12 @@ try {
   const min=minText===''?null:Number(minText),max=maxText===''?null:Number(maxText);
   return currentRows.filter(function(r){
    const rowType=r.entrada?'entrada':'saida';
-   const value=Number(r.valor||0),rowStatus=r.status||'Pendente';
+   const value=Number(r.valor||0);
+   const rowStatus=String(r.status||'Pendente').trim().toLocaleLowerCase('pt-BR');
    if(type&&rowType!==type)return false;
-   if(category&&(r.categoria||'')!==category)return false;
-   if(method&&(r.metodo||'')!==method)return false;
-   if(status&&rowStatus!==status)return false;
+   if(category&&(String(r.categoria||'').trim())!==category)return false;
+   if(method&&(String(r.metodo||'').trim())!==method)return false;
+   if(status&&rowStatus!==status.trim().toLocaleLowerCase('pt-BR'))return false;
    if(min!==null&&value<min)return false;
    if(max!==null&&value>max)return false;
    return true;
