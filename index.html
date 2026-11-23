@@ -76,12 +76,13 @@ try {
    <form id="entryForm">
     <input id="editId" type="hidden">
     <div class="formgrid">
-     <div><label for="data">Data *</label><input id="data" type="date" required></div>
+     <div><label id="dataLabel" for="data">Data *</label><input id="data" type="date" required></div>
      <div><label for="descricao">Descrição *</label><input id="descricao" maxlength="200" required></div>
      <div><label for="valor">Valor (R$) *</label><input id="valor" type="number" min="0" step="0.01" required></div>
      <div><label for="tipo">Tipo *</label><select id="tipo" required><option value="">Selecione</option><option value="saida">Saída</option><option value="entrada">Entrada</option></select></div>
      <div><label for="categoria">Categoria</label><input id="categoria" list="categorias"><datalist id="categorias"><option>Alimentação</option><option>Casa</option><option>Vestuário</option><option>Entretenimento</option><option>Educação</option><option>Ferramentas</option><option>Investimento</option><option>Outros</option></datalist></div>
      <div><label for="metodo">Método</label><input id="metodo" list="metodos"><datalist id="metodos"><option>Santander</option><option>Nomad</option><option>XP</option><option>Bradesco</option><option>Inter</option><option>Mercado Pago</option><option>Espécie</option><option>C6</option><option>Porto</option></datalist></div>
+     <div id="paymentMonthWrap" class="hidden"><label for="paymentMonth">Mês de pagamento da fatura *</label><input id="paymentMonth" type="month"><small class="muted">O vencimento será registrado no dia 10 do mês escolhido. Para compras no melhor dia (30), normalmente selecione o mês seguinte.</small></div>
      <div><label for="parcela">Parcela</label><input id="parcela" placeholder="Ex.: 1/3"></div>
      <div><label for="status">Status</label><select id="status"><option>Pago</option><option selected>Pendente</option><option>Atrasado</option></select></div>
      <div><label for="subtipo">Classificação</label><select id="subtipo"><option value="">Não se aplica</option><option value="fixos">Fixos</option><option value="cartao de credito">Cartão de crédito</option><option value="boletos">Boletos</option><option value="dinheiro">Dinheiro</option><option value="recebidos">Recebidos</option><option value="pagamentos">Pagamentos</option><option value="extra">Extra</option></select></div>
@@ -90,7 +91,7 @@ try {
    </form>
   </section>
   <section class="panel">
-   <div class="topline"><h2>Relatórios e lançamentos</h2><div class="actions"><div><label for="monthFilter">Mês</label><input id="monthFilter" type="month" value="2026-11"></div><button id="refreshBtn" type="button" class="secondary">Atualizar</button><button id="csvBtn" type="button" class="secondary">Exportar CSV</button></div></div>
+   <div class="topline"><h2>Relatórios e lançamentos</h2><div class="actions"><div><label for="monthFilter">Mês do relatório</label><input id="monthFilter" type="month" value="2026-11"></div><button id="refreshBtn" type="button" class="secondary">Atualizar</button><button id="csvBtn" type="button" class="secondary">Exportar CSV</button></div></div>
    <div class="analytics-grid">
     <div class="analytics-chart">
      <div class="chart">
@@ -124,7 +125,7 @@ try {
      <button id="clearSelectionBtn" type="button" class="secondary" disabled>Limpar seleção</button>
     </div>
    </div>
-   <div class="tablewrap"><table><thead><tr><th><input id="selectAllRows" class="selection-check" type="checkbox" aria-label="Selecionar todos os lançamentos exibidos"></th><th>Data</th><th>Descrição</th><th>Parcela</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="10">Nenhum lançamento carregado.</td></tr></tbody></table></div>
+   <div class="tablewrap"><table><thead><tr><th><input id="selectAllRows" class="selection-check" type="checkbox" aria-label="Selecionar todos os lançamentos exibidos"></th><th>Data da compra / lançamento</th><th>Pagamento da fatura</th><th>Descrição</th><th>Parcela</th><th>Tipo</th><th>Valor</th><th>Categoria</th><th>Método</th><th>Status</th><th>Ação</th></tr></thead><tbody id="rows"><tr><td colspan="11">Nenhum lançamento carregado.</td></tr></tbody></table></div>
    <p id="dataMessage" class="muted"></p>
   </section>
  </section>
@@ -222,13 +223,39 @@ try {
   const nextYear=m===12?y+1:y,nextMonth=m===12?1:m+1;
   return {start:y+'-'+String(m).padStart(2,'0')+'-01',end:nextYear+'-'+String(nextMonth).padStart(2,'0')+'-01'};
  }
+ function normalizedText(value){
+  return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
+ }
+ function isBradescoCreditCard(row){
+  return normalizedText(row&&row.metodo)==='bradesco' && normalizedText(row&&row.saida)==='cartao de credito';
+ }
+ function getReportDate(row){
+  return isBradescoCreditCard(row)&&row.data_pagamento ? row.data_pagamento : row.data;
+ }
+ function isBradescoCreditCardForm(){
+  return $('tipo').value==='saida' && normalizedText($('subtipo').value)==='cartao de credito' && normalizedText($('metodo').value)==='bradesco';
+ }
+ function updatePaymentMonthField(){
+  const active=isBradescoCreditCardForm();
+  show('paymentMonthWrap',active);
+  $('dataLabel').textContent=active?'Data da compra *':'Data *';
+  $('paymentMonth').required=active&&!$('editId').value;
+  if(!active)$('paymentMonth').value='';
+ }
  async function loadRows(){
   const token=await ensureSession();
   const range=monthRange($('monthFilter').value);
   const params=new URLSearchParams({select:'*',order:'data.desc',limit:'1000'});
-  if(range){params.set('and','(data.gte.'+range.start+',data.lt.'+range.end+')');}
+  if(range){
+   params.set('or','(and(data.gte.'+range.start+',data.lt.'+range.end+'),and(data_pagamento.gte.'+range.start+',data_pagamento.lt.'+range.end+'))');
+  }
   const data=await api('/rest/v1/lancamentos?'+params.toString(),{token:token});
-  currentRows=Array.isArray(data)?data:[];
+  const fetchedRows=Array.isArray(data)?data:[];
+  currentRows=fetchedRows.filter(function(row){
+   if(!range)return true;
+   const reportDate=getReportDate(row);
+   return reportDate>=range.start&&reportDate<range.end;
+  });
   populateFilterOptions('categoryFilter',currentRows.map(function(r){return r.categoria;}),'Todas');
   populateFilterOptions('methodFilter',currentRows.map(function(r){return r.metodo;}),'Todos');
   renderRows();
@@ -328,7 +355,7 @@ try {
   const rows=visibleRows();
   renderSummary(rows);
   if(!rows.length){
-   body.innerHTML='<tr><td colspan="10">Nenhum lançamento corresponde aos filtros.</td></tr>';
+   body.innerHTML='<tr><td colspan="11">Nenhum lançamento corresponde aos filtros.</td></tr>';
    msg('dataMessage','0 lançamento(s) encontrados de '+currentRows.length+' no mês selecionado.','muted');
    refreshSelectionUI(rows);return;
   }
@@ -338,7 +365,9 @@ try {
    check.type='checkbox';check.className='selection-check';check.checked=selectedIds.has(String(r.id));check.setAttribute('aria-label','Selecionar '+(r.descricao||'lançamento'));
    check.addEventListener('change',function(){if(check.checked)selectedIds.add(String(r.id));else selectedIds.delete(String(r.id));refreshSelectionUI(rows);});
    checkCell.appendChild(check);tr.appendChild(checkCell);
-   const values=[new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR'),r.descricao,r.parcela||'—',r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
+   const purchaseDate=new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR');
+   const paymentDate=isBradescoCreditCard(r)&&r.data_pagamento?new Date(r.data_pagamento+'T12:00:00').toLocaleDateString('pt-BR'):'—';
+   const values=[purchaseDate,paymentDate,r.descricao,r.parcela||'—',r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
    values.forEach(function(v){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
    const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.className='secondary';btn.onclick=function(){editRow(r);};td.appendChild(btn);tr.appendChild(td);body.appendChild(tr);
   });
@@ -374,8 +403,14 @@ try {
  async function saveRecord(event){
   event.preventDefault();
   const type=$('tipo').value,sub=$('subtipo').value;
-  const record={data:$('data').value,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,saida:type==='saida'?(sub||'Saída'):null,entrada:type==='entrada'?(sub||'Entrada'):null,status:$('status').value};
   const id=$('editId').value;
+  const cardPurchase=isBradescoCreditCardForm();
+  const paymentMonth=$('paymentMonth').value;
+  if(cardPurchase&&!paymentMonth&&!id){
+   msg('formMessage','Selecione o mês em que a fatura do Bradesco será paga.','error');
+   $('paymentMonth').focus();return;
+  }
+  const record={data:$('data').value,data_pagamento:cardPurchase&&paymentMonth?paymentMonth+'-10':null,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,saida:type==='saida'?(sub||'Saída'):null,entrada:type==='entrada'?(sub||'Entrada'):null,status:$('status').value};
   try{
    const token=await ensureSession();
    let path='/rest/v1/lancamentos',method='POST';
@@ -385,15 +420,15 @@ try {
   }catch(error){msg('formMessage','Não foi possível salvar: '+error.message,'error');}
  }
  function resetForm(){
-  $('entryForm').reset();$('editId').value='';$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);
+  $('entryForm').reset();$('editId').value='';$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);updatePaymentMonthField();
  }
  function editRow(r){
-  $('editId').value=r.id;$('data').value=r.data;$('descricao').value=r.descricao;$('valor').value=r.valor;$('tipo').value=r.entrada?'entrada':'saida';$('categoria').value=r.categoria||'';$('metodo').value=r.metodo||'';$('parcela').value=r.parcela||'';$('status').value=r.status||'Pendente';$('subtipo').value=r.entrada?(r.entrada==='Entrada'?'':r.entrada):(r.saida==='Saída'?'':r.saida);$('formTitle').textContent='Editar lançamento';$('saveBtn').textContent='Salvar alterações';show('cancelEditBtn',true);window.scrollTo({top:0,behavior:'smooth'});
+  $('editId').value=r.id;$('data').value=r.data;$('paymentMonth').value=r.data_pagamento?r.data_pagamento.slice(0,7):'';$('descricao').value=r.descricao;$('valor').value=r.valor;$('tipo').value=r.entrada?'entrada':'saida';$('categoria').value=r.categoria||'';$('metodo').value=r.metodo||'';$('parcela').value=r.parcela||'';$('status').value=r.status||'Pendente';$('subtipo').value=r.entrada?(r.entrada==='Entrada'?'':r.entrada):(r.saida==='Saída'?'':r.saida);updatePaymentMonthField();$('formTitle').textContent='Editar lançamento';$('saveBtn').textContent='Salvar alterações';show('cancelEditBtn',true);window.scrollTo({top:0,behavior:'smooth'});
  }
  function exportCsv(){
-  const header=['data','descricao','tipo','valor','categoria','metodo','status','parcela'];
+  const header=['data','data_pagamento','descricao','tipo','valor','categoria','metodo','status','parcela'];
   const lines=[header.join(';')];
-  currentRows.forEach(function(r){const vals=[r.data,r.descricao,r.entrada?'Entrada':'Saída',r.valor,r.categoria||'',r.metodo||'',r.status||'',r.parcela||''];lines.push(vals.map(function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';}).join(';'));});
+  currentRows.forEach(function(r){const vals=[r.data,r.data_pagamento||'',r.descricao,r.entrada?'Entrada':'Saída',r.valor,r.categoria||'',r.metodo||'',r.status||'',r.parcela||''];lines.push(vals.map(function(v){return '"'+String(v==null?'':v).replace(/"/g,'""')+'"';}).join(';'));});
   const blob=new Blob(['\ufeff'+lines.join('\n')],{type:'text/csv;charset=utf-8;'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='lancamentos_'+$('monthFilter').value+'.csv';a.click();URL.revokeObjectURL(url);
  }
  async function init(){
@@ -410,6 +445,10 @@ try {
  $('testConnectionBtn').addEventListener('click',testConnection);
  $('logoutBtn').addEventListener('click',logout);
  $('entryForm').addEventListener('submit',saveRecord);
+ $('tipo').addEventListener('change',updatePaymentMonthField);
+ $('subtipo').addEventListener('change',updatePaymentMonthField);
+ $('metodo').addEventListener('input',updatePaymentMonthField);
+ $('metodo').addEventListener('change',updatePaymentMonthField);
  $('cancelEditBtn').addEventListener('click',resetForm);
  $('refreshBtn').addEventListener('click',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
  $('monthFilter').addEventListener('change',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
@@ -427,6 +466,7 @@ try {
  $('bulkStatusBtn').addEventListener('click',bulkUpdateStatus);
  $('clearSelectionBtn').addEventListener('click',clearSelection);
  $('csvBtn').addEventListener('click',exportCsv);
+ updatePaymentMonthField();
  window.addEventListener('error',function(e){msg('authMessage','Erro no aplicativo: '+(e.message||'falha de JavaScript'),'error');});
  init();
 })();
