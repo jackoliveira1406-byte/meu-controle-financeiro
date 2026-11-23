@@ -29,7 +29,7 @@ button.secondary{background:#e8f1eb;color:var(--green)}button:disabled{opacity:.
 .bar.expense{background:#bd7a43}.bar.balance{background:#5478a7}.bar.negative{background:var(--red)}.bar.paid{background:#31845b}.bar.pending{background:#d69b2d}.bar.overdue{background:#c04444}
 .bar-value{font-size:11px;font-weight:700;text-align:center;white-space:nowrap}.bar-label{font-size:11px;color:var(--muted);text-align:center;line-height:1.15;overflow-wrap:anywhere}
 .analytics-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:16px;align-items:stretch;margin:12px 0 16px}.analytics-chart{min-width:0}.method-breakdown{border:1px solid var(--line);border-radius:12px;background:#fbfdfb;padding:12px;min-width:0}.method-breakdown h3{font-size:15px;margin:0 0 8px}.method-table{min-width:330px;width:100%;table-layout:fixed}.method-table th,.method-table td{padding:9px 6px}.method-table th:not(:first-child),.method-table td:not(:first-child){text-align:right;white-space:nowrap}.method-table td:first-child{overflow-wrap:anywhere}.method-total td{font-weight:750;border-top:1px solid var(--line)}.chart-note{margin:8px 0 0;font-size:12px;color:var(--muted)}
-.filters{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:16px 0}
+.filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0}
 .value-range{display:grid;grid-template-columns:1fr 1fr;gap:6px}.value-range input{min-width:0}
 .bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;background:#f4f7f5;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
 .selection-check{width:18px;height:18px;min-height:18px;vertical-align:middle;accent-color:var(--green);cursor:pointer}
@@ -110,6 +110,7 @@ try {
     </aside>
    </div>
    <div class="filters" aria-label="Filtros dos lançamentos">
+    <div><label for="descriptionFilter">Descrição</label><input id="descriptionFilter" type="search" placeholder="Pesquisar descrição..."></div>
     <div><label for="typeFilter">Tipo</label><select id="typeFilter"><option value="">Todos</option><option value="entrada">Entrada</option><option value="saida">Saída</option></select></div>
     <div><label>Valor (R$)</label><div class="value-range"><input id="valueMinFilter" type="number" min="0" step="0.01" placeholder="De" aria-label="Valor mínimo"><input id="valueMaxFilter" type="number" min="0" step="0.01" placeholder="Até" aria-label="Valor máximo"></div></div>
     <div><label for="categoryFilter">Categoria</label><select id="categoryFilter"><option value="">Todas</option></select></div>
@@ -323,6 +324,7 @@ try {
   if(Array.from(select.options).some(function(o){return o.value===previous;}))select.value=previous;
  }
  function visibleRows(){
+  const description=normalizedText($('descriptionFilter').value);
   const type=$('typeFilter').value,category=$('categoryFilter').value,method=$('methodFilter').value,status=$('statusFilter').value;
   const minText=$('valueMinFilter').value,maxText=$('valueMaxFilter').value;
   const min=minText===''?null:Number(minText),max=maxText===''?null:Number(maxText);
@@ -330,6 +332,7 @@ try {
    const rowType=r.entrada?'entrada':'saida';
    const value=Number(r.valor||0);
    const rowStatus=String(r.status||'Pendente').trim().toLocaleLowerCase('pt-BR');
+   if(description&&!normalizedText(r.descricao).includes(description))return false;
    if(type&&rowType!==type)return false;
    if(category&&(String(r.categoria||'').trim())!==category)return false;
    if(method&&(String(r.metodo||'').trim())!==method)return false;
@@ -395,6 +398,7 @@ try {
   }
  }
  function clearFilters(){
+  $('descriptionFilter').value='';
   $('typeFilter').value='';$('valueMinFilter').value='';$('valueMaxFilter').value='';
   $('categoryFilter').value='';$('methodFilter').value='';$('statusFilter').value='';
   selectedIds.clear();renderRows();
@@ -452,7 +456,7 @@ try {
  $('cancelEditBtn').addEventListener('click',resetForm);
  $('refreshBtn').addEventListener('click',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
  $('monthFilter').addEventListener('change',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
- ['typeFilter','categoryFilter','methodFilter','statusFilter','valueMinFilter','valueMaxFilter'].forEach(function(id){
+ ['descriptionFilter','typeFilter','categoryFilter','methodFilter','statusFilter','valueMinFilter','valueMaxFilter'].forEach(function(id){
   $(id).addEventListener('input',function(){selectedIds.clear();renderRows();});
   $(id).addEventListener('change',function(){selectedIds.clear();renderRows();});
  });
