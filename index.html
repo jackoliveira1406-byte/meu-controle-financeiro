@@ -369,6 +369,7 @@ try {
    const token=await ensureSession();
    if(!applyToFuture){
     const query=new URLSearchParams();query.set('id','eq.'+encodeURIComponent(payload.id));
+    payload.record.atualizado_em=new Date().toISOString();
     await api('/rest/v1/lancamentos?'+query.toString(),{method:'PATCH',token:token,body:payload.record,prefer:'return=minimal'});
     closeInstallmentEditModal();
     editingOriginal=null;resetForm();
@@ -393,7 +394,6 @@ try {
     saida:payload.record.saida,
     entrada:payload.record.entrada,
     status:payload.record.status,
-    parcela:updatedInstallment.current+'/'+updatedInstallment.total,
     atualizado_em:new Date().toISOString()
    };
    const allIds=[payload.id].concat(series.matches.map(function(row){return String(row.id);}));
@@ -405,6 +405,15 @@ try {
    const currentSpecific={data:payload.record.data,data_pagamento:payload.record.data_pagamento,parcela:payload.record.parcela,atualizado_em:new Date().toISOString()};
    const currentQuery=new URLSearchParams();currentQuery.set('id','eq.'+encodeURIComponent(payload.id));
    await api('/rest/v1/lancamentos?'+currentQuery.toString(),{method:'PATCH',token:token,body:currentSpecific,prefer:'return=minimal'});
+   await Promise.all(series.matches.map(function(row){
+    const candidate=parseInstallment(row.parcela);
+    const query=new URLSearchParams();query.set('id','eq.'+encodeURIComponent(String(row.id)));
+    return api('/rest/v1/lancamentos?'+query.toString(),{
+     method:'PATCH',token:token,
+     body:{parcela:candidate.current+'/'+updatedInstallment.total,atualizado_em:new Date().toISOString()},
+     prefer:'return=minimal'
+    });
+   }));
    closeInstallmentEditModal();
    editingOriginal=null;resetForm();
    const missingText=series.missing.length?' Não localizei: '+series.missing.join(', ')+'.':'';
