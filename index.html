@@ -300,10 +300,17 @@ try {
   try{
    const token=await ensureSession();
    const range=buildAnnualMonthRange(year);
-   const params=new URLSearchParams({select:'*',order:'data.asc',limit:'1000'});
+   const params=new URLSearchParams({select:'*',order:'data.asc,id.asc',limit:'1000'});
    params.set('or','(and(data.gte.'+range.start+',data.lt.'+range.end+'),and(data_pagamento.gte.'+range.start+',data_pagamento.lt.'+range.end+'))');
-   const data=await api('/rest/v1/lancamentos?'+params.toString(),{token:token});
-   const rows=(Array.isArray(data)?data:[]).filter(function(row){
+   let fetchedRows=[],offset=0,batch=[];
+   do{
+    const pageParams=new URLSearchParams(params.toString());
+    pageParams.set('offset',String(offset));
+    batch=await api('/rest/v1/lancamentos?'+pageParams.toString(),{token:token});
+    if(Array.isArray(batch))fetchedRows=fetchedRows.concat(batch);
+    offset+=Array.isArray(batch)?batch.length:0;
+   }while(Array.isArray(batch)&&batch.length===1000);
+   const rows=fetchedRows.filter(function(row){
     const reportDate=getReportDate(row);
     return reportDate>=range.start&&reportDate<range.end;
    });
