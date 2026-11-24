@@ -568,7 +568,6 @@ try {
   event.preventDefault();
   const type=$('tipo').value,sub=$('subtipo').value;
   const id=$('editId').value;
-  const id=$('editId').value;
   if(!id){
    const requiredFields=['data','descricao','valor','tipo','categoria','metodo','parcela','status','subtipo'];
    const missing=requiredFields.find(function(field){return String($(field).value||'').trim()==='';});
