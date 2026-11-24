@@ -19,6 +19,12 @@ button.secondary{background:#e8f1eb;color:var(--green)}
 button.danger-button{background:#fff0ee;color:var(--red);border:1px solid #f2c5c0}
 button.danger-button:hover{background:#ffe3df}
 button:disabled{opacity:.55;cursor:wait}
+.modal-overlay{position:fixed;inset:0;z-index:1000;background:#13241ccc;display:flex;align-items:center;justify-content:center;padding:16px}
+.modal-card{width:min(100%,480px);background:#fff;border-radius:16px;padding:22px;box-shadow:0 18px 55px #0003}
+.modal-card h3{margin:0 0 8px;font-size:19px}
+.modal-card p{line-height:1.5;color:var(--muted);margin:0 0 18px}
+.modal-actions{display:flex;flex-wrap:wrap;gap:9px;justify-content:flex-end}
+.modal-actions button{flex:1 1 135px}
 .row-actions{flex-wrap:nowrap;align-items:center;gap:6px}
 .row-actions button{padding:8px 10px;min-height:36px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.muted{color:var(--muted);font-size:13px}.hidden{display:none!important}
@@ -181,6 +187,17 @@ try {
    <p id="dataMessage" class="muted"></p>
   </section>
  </section>
+ <div id="installmentEditModal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="installmentModalTitle">
+  <div class="modal-card">
+   <h3 id="installmentModalTitle">Como deseja aplicar a alteração?</h3>
+   <p id="installmentModalText">Este lançamento faz parte de uma compra parcelada. Escolha se a alteração será aplicada somente a esta parcela ou também às próximas. As parcelas anteriores e as datas próprias de cada parcela serão preservadas.</p>
+   <div class="modal-actions">
+    <button id="installmentOnlyBtn" type="button" class="secondary">Somente esta parcela</button>
+    <button id="installmentFutureBtn" type="button">Esta e as próximas</button>
+    <button id="installmentCancelBtn" type="button" class="danger-button">Cancelar</button>
+   </div>
+  </div>
+ </div>
 </main>
 <script src="./config.js?v=4"></script>
 <script>
@@ -190,7 +207,7 @@ try {
  const cfg=window.APP_CONFIG||{};
  const API=(cfg.SUPABASE_URL||'').replace(/\/+$/,'');
  const SESSION_KEY='financeiro_supabase_session_v1';
- let session=null,currentRows=[];
+ let session=null,currentRows=[],editingOriginal=null,pendingInstallmentEdit=null;
  const selectedIds=new Set();
  function show(id,yes){$(id).classList.toggle('hidden',!yes);}
  function msg(id,text,kind){const el=$(id);el.textContent=text;el.className=kind||'muted';}
@@ -277,6 +294,124 @@ try {
  }
  function normalizedText(value){
   return String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLocaleLowerCase('pt-BR');
+ }
+ function parseInstallment(value){
+  const match=String(value||'').trim().match(/^(\d+)\s*\/\s*(\d+)$/);
+  if(!match)return null;
+  const current=Number(match[1]),total=Number(match[2]);
+  if(!Number.isInteger(current)||!Number.isInteger(total)||current<1||total<2||current>total)return null;
+  return {current:current,total:total};
+ }
+ function monthNumber(dateValue){
+  if(!dateValue||!/^\d{4}-\d{2}-\d{2}$/.test(String(dateValue)))return null;
+  const parts=String(dateValue).slice(0,7).split('-').map(Number);
+  return parts[0]*12+parts[1]-1;
+ }
+ function sameInstallmentSeriesBase(row,original){
+  return normalizedText(row.descricao)===normalizedText(original.descricao)
+   && normalizedText(row.metodo)===normalizedText(original.metodo)
+   && normalizedText(row.categoria)===normalizedText(original.categoria)
+   && normalizedText(row.saida)===normalizedText(original.saida)
+   && normalizedText(row.entrada)===normalizedText(original.entrada);
+ }
+ async function findFollowingInstallments(original){
+  const parsed=parseInstallment(original.parcela);
+  if(!parsed||parsed.current>=parsed.total)return {matches:[],missing:[]};
+  const token=await ensureSession();
+  const params=new URLSearchParams({select:'*',order:'data.asc,id.asc',limit:'1000'});
+  params.set('descricao','eq.'+String(original.descricao||''));
+  let rows=[],offset=0,page=[];
+  do{
+   const pageParams=new URLSearchParams(params.toString());
+   pageParams.set('offset',String(offset));
+   page=await api('/rest/v1/lancamentos?'+pageParams.toString(),{token:token});
+   if(Array.isArray(page))rows=rows.concat(page);
+   offset+=Array.isArray(page)?page.length:0;
+  }while(Array.isArray(page)&&page.length===1000);
+  const baseMonth=monthNumber(getReportDate(original));
+  const byInstallment=new Map();
+  rows.forEach(function(row){
+   if(String(row.id)===String(original.id)||!sameInstallmentSeriesBase(row,original))return;
+   const candidate=parseInstallment(row.parcela);
+   if(!candidate||candidate.total!==parsed.total||candidate.current<=parsed.current)return;
+   const candidateMonth=monthNumber(getReportDate(row));
+   if(baseMonth===null||candidateMonth===null||candidateMonth-baseMonth!==candidate.current-parsed.current)return;
+   if(!byInstallment.has(candidate.current))byInstallment.set(candidate.current,[]);
+   byInstallment.get(candidate.current).push(row);
+  });
+  const matches=[],missing=[];
+  for(let number=parsed.current+1;number<=parsed.total;number++){
+   const candidates=byInstallment.get(number)||[];
+   if(candidates.length>1){
+    throw new Error('Encontrei mais de um registro que pode ser a parcela '+number+'/'+parsed.total+'. Para evitar alterar outra compra, atualize somente esta parcela ou confira os lançamentos duplicados.');
+   }
+   if(candidates.length===1)matches.push(candidates[0]);
+   else missing.push(number+'/'+parsed.total);
+  }
+  return {matches:matches,missing:missing};
+ }
+ function openInstallmentEditModal(original){
+  const parsed=parseInstallment(original.parcela);
+  $('installmentModalText').textContent='Você está alterando a parcela '+parsed.current+'/'+parsed.total+'. Escolha se deseja aplicar a alteração somente a esta parcela ou também às parcelas seguintes da mesma compra. As parcelas anteriores, a numeração e as datas próprias de cada mês serão preservadas.';
+  pendingInstallmentEdit=true;
+  show('installmentEditModal',true);
+ }
+ function closeInstallmentEditModal(){
+  pendingInstallmentEdit=null;
+  show('installmentEditModal',false);
+ }
+ async function saveEditedInstallment(applyToFuture){
+  if(!pendingInstallmentEdit)return;
+  const payload=pendingInstallmentEdit;
+  $('installmentOnlyBtn').disabled=true;
+  $('installmentFutureBtn').disabled=true;
+  $('installmentCancelBtn').disabled=true;
+  try{
+   const token=await ensureSession();
+   if(!applyToFuture){
+    const query=new URLSearchParams();query.set('id','eq.'+encodeURIComponent(payload.id));
+    await api('/rest/v1/lancamentos?'+query.toString(),{method:'PATCH',token:token,body:payload.record,prefer:'return=minimal'});
+    closeInstallmentEditModal();
+    editingOriginal=null;resetForm();
+    msg('formMessage','Somente esta parcela foi atualizada.','success');
+    await loadRows();
+    return;
+   }
+   const series=await findFollowingInstallments(payload.original);
+   if(!series.matches.length){
+    throw new Error('Não encontrei as parcelas seguintes correspondentes. Nenhum lançamento foi alterado. Você pode escolher “Somente esta parcela” ou conferir se as parcelas seguintes têm a mesma descrição, método, categoria e sequência mensal.');
+   }
+   const shared={
+    descricao:payload.record.descricao,
+    valor:payload.record.valor,
+    metodo:payload.record.metodo,
+    categoria:payload.record.categoria,
+    saida:payload.record.saida,
+    entrada:payload.record.entrada,
+    status:payload.record.status,
+    atualizado_em:new Date().toISOString()
+   };
+   const allIds=[payload.id].concat(series.matches.map(function(row){return String(row.id);}));
+   const batchQuery=new URLSearchParams();batchQuery.set('id','in.('+allIds.join(',')+')');
+   const changed=await api('/rest/v1/lancamentos?'+batchQuery.toString(),{method:'PATCH',token:token,body:shared,prefer:'return=representation'});
+   if(!Array.isArray(changed)||changed.length!==allIds.length){
+    throw new Error('O Supabase não confirmou a atualização de todas as parcelas. Foram solicitados '+allIds.length+' lançamentos.');
+   }
+   const currentSpecific={data:payload.record.data,data_pagamento:payload.record.data_pagamento,parcela:payload.record.parcela,atualizado_em:new Date().toISOString()};
+   const currentQuery=new URLSearchParams();currentQuery.set('id','eq.'+encodeURIComponent(payload.id));
+   await api('/rest/v1/lancamentos?'+currentQuery.toString(),{method:'PATCH',token:token,body:currentSpecific,prefer:'return=minimal'});
+   closeInstallmentEditModal();
+   editingOriginal=null;resetForm();
+   const missingText=series.missing.length?' Não localizei: '+series.missing.join(', ')+'.':'';
+   msg('formMessage','Alteração aplicada à parcela atual e a '+series.matches.length+' parcela(s) seguinte(s). As anteriores foram preservadas.'+missingText,'success');
+   await loadRows();
+  }catch(error){
+   msg('formMessage','Não foi possível aplicar a alteração: '+error.message,'error');
+  }finally{
+   $('installmentOnlyBtn').disabled=false;
+   $('installmentFutureBtn').disabled=false;
+   $('installmentCancelBtn').disabled=false;
+  }
  }
  function isBradescoCreditCard(row){
   return normalizedText(row&&row.metodo)==='bradesco' && normalizedText(row&&row.saida)==='cartao de credito';
@@ -583,7 +718,15 @@ try {
    $('paymentMonth').focus();return;
   }
   const classification=sub==='na'?'':sub;
-  const record={data:$('data').value,data_pagamento:cardPurchase?paymentMonth+'-10':null,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim(),metodo:$('metodo').value.trim(),categoria:$('categoria').value.trim(),saida:type==='saida'?(classification||'Saída'):null,entrada:type==='entrada'?(classification||'Entrada'):null,status:$('status').value};
+  const record={data:$('data').value,data_pagamento:cardPurchase?(paymentMonth?paymentMonth+'-10':(editingOriginal&&editingOriginal.data_pagamento||null)):null,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim(),metodo:$('metodo').value.trim(),categoria:$('categoria').value.trim(),saida:type==='saida'?(classification||'Saída'):null,entrada:type==='entrada'?(classification||'Entrada'):null,status:$('status').value};
+  if(id&&editingOriginal){
+   const installment=parseInstallment(editingOriginal.parcela);
+   if(installment&&installment.current<installment.total){
+    pendingInstallmentEdit={id:id,record:record,original:editingOriginal};
+    openInstallmentEditModal(editingOriginal);
+    return;
+   }
+  }
   try{
    const token=await ensureSession();
    let path='/rest/v1/lancamentos',method='POST';
@@ -593,7 +736,7 @@ try {
   }catch(error){msg('formMessage','Não foi possível salvar: '+error.message,'error');}
  }
  function resetForm(){
-  $('entryForm').reset();$('editId').value='';$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);updatePaymentMonthField();
+  $('entryForm').reset();$('editId').value='';editingOriginal=null;$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);updatePaymentMonthField();
  }
  async function deleteRow(r,button){
   const description=String(r.descricao||'lançamento sem descrição');
@@ -618,6 +761,7 @@ try {
   }
  }
  function editRow(r){
+  editingOriginal=Object.assign({},r);
   $('editId').value=r.id;$('data').value=r.data;$('paymentMonth').value=r.data_pagamento?r.data_pagamento.slice(0,7):'';$('descricao').value=r.descricao;$('valor').value=r.valor;$('tipo').value=r.entrada?'entrada':'saida';$('categoria').value=r.categoria||'';$('metodo').value=r.metodo||'';$('parcela').value=r.parcela||'';$('status').value=r.status||'Pendente';$('subtipo').value=r.entrada?(r.entrada==='Entrada'?'na':r.entrada):(r.saida==='Saída'?'na':r.saida);updatePaymentMonthField();$('formTitle').textContent='Editar lançamento';$('saveBtn').textContent='Salvar alterações';show('cancelEditBtn',true);window.scrollTo({top:0,behavior:'smooth'});
  }
  function exportCsv(){
@@ -645,6 +789,9 @@ try {
  $('metodo').addEventListener('input',updatePaymentMonthField);
  $('metodo').addEventListener('change',updatePaymentMonthField);
  $('cancelEditBtn').addEventListener('click',resetForm);
+ $('installmentOnlyBtn').addEventListener('click',function(){saveEditedInstallment(false);});
+ $('installmentFutureBtn').addEventListener('click',function(){saveEditedInstallment(true);});
+ $('installmentCancelBtn').addEventListener('click',closeInstallmentEditModal);
  $('refreshBtn').addEventListener('click',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
  $('monthFilter').addEventListener('change',function(){
   selectedIds.clear();
