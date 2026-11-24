@@ -15,7 +15,12 @@ header h1{font-size:20px;margin:0}header small{opacity:.85}.wrap{max-width:1120p
 label{display:block;font-weight:650;font-size:13px;margin:0 0 6px}input,select,button{font:inherit}
 input,select{width:100%;border:1px solid #cbd7cf;border-radius:9px;padding:10px;background:white;color:var(--ink);min-height:42px}
 button{border:0;border-radius:9px;padding:10px 15px;background:var(--green);color:white;font-weight:650;cursor:pointer;min-height:42px}
-button.secondary{background:#e8f1eb;color:var(--green)}button:disabled{opacity:.55;cursor:wait}
+button.secondary{background:#e8f1eb;color:var(--green)}
+button.danger-button{background:#fff0ee;color:var(--red);border:1px solid #f2c5c0}
+button.danger-button:hover{background:#ffe3df}
+button:disabled{opacity:.55;cursor:wait}
+.row-actions{flex-wrap:nowrap;align-items:center;gap:6px}
+.row-actions button{padding:8px 10px;min-height:36px}
 .actions{display:flex;gap:8px;flex-wrap:wrap;align-items:end}.muted{color:var(--muted);font-size:13px}.hidden{display:none!important}
 .formgrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}.cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
 .metric{font-size:24px;font-weight:750;margin-top:5px}.metric-label{font-size:13px;color:var(--muted)}
@@ -372,7 +377,11 @@ try {
    const paymentDate=isBradescoCreditCard(r)&&r.data_pagamento?new Date(r.data_pagamento+'T12:00:00').toLocaleDateString('pt-BR'):'—';
    const values=[purchaseDate,paymentDate,r.descricao,r.parcela||'—',r.entrada?'Entrada':'Saída',money(r.valor),r.categoria||'—',r.metodo||'—',r.status||'Pendente'];
    values.forEach(function(v){const td=document.createElement('td');td.textContent=v;tr.appendChild(td);});
-   const td=document.createElement('td'),btn=document.createElement('button');btn.type='button';btn.textContent='Editar';btn.className='secondary';btn.onclick=function(){editRow(r);};td.appendChild(btn);tr.appendChild(td);body.appendChild(tr);
+   const td=document.createElement('td'),actions=document.createElement('div');
+   actions.className='actions row-actions';
+   const editBtn=document.createElement('button');editBtn.type='button';editBtn.textContent='Editar';editBtn.className='secondary';editBtn.onclick=function(){editRow(r);};
+   const deleteBtn=document.createElement('button');deleteBtn.type='button';deleteBtn.textContent='Excluir';deleteBtn.className='danger-button';deleteBtn.title='Excluir este lançamento';deleteBtn.onclick=function(){deleteRow(r,deleteBtn);};
+   actions.appendChild(editBtn);actions.appendChild(deleteBtn);td.appendChild(actions);tr.appendChild(td);body.appendChild(tr);
   });
   msg('dataMessage',rows.length+' lançamento(s) exibido(s) de '+currentRows.length+' no mês selecionado.','muted');
   refreshSelectionUI(rows);
@@ -425,6 +434,28 @@ try {
  }
  function resetForm(){
   $('entryForm').reset();$('editId').value='';$('formTitle').textContent='Novo lançamento';$('saveBtn').textContent='Salvar lançamento';show('cancelEditBtn',false);updatePaymentMonthField();
+ }
+ async function deleteRow(r,button){
+  const description=String(r.descricao||'lançamento sem descrição');
+  const date=new Date(r.data+'T12:00:00').toLocaleDateString('pt-BR');
+  const message='Deseja excluir permanentemente este lançamento?\n\nDescrição: '+description+'\nData: '+date+'\nValor: '+money(r.valor)+'\n\nEsta ação não poderá ser desfeita.';
+  if(!window.confirm(message))return;
+  if(button)button.disabled=true;
+  try{
+   const token=await ensureSession();
+   const query=new URLSearchParams();query.set('id','eq.'+String(r.id));
+   const deleted=await api('/rest/v1/lancamentos?'+query.toString(),{method:'DELETE',token:token,prefer:'return=representation'});
+   if(!Array.isArray(deleted)||deleted.length===0){
+    throw new Error('O Supabase não confirmou a exclusão. Confira se a política de exclusão foi criada no banco de dados.');
+   }
+   selectedIds.delete(String(r.id));
+   await loadRows();
+   msg('dataMessage','Lançamento "'+description+'" excluído com sucesso.','success');
+  }catch(error){
+   msg('dataMessage','Não foi possível excluir o lançamento: '+error.message,'error');
+  }finally{
+   if(button)button.disabled=false;
+  }
  }
  function editRow(r){
   $('editId').value=r.id;$('data').value=r.data;$('paymentMonth').value=r.data_pagamento?r.data_pagamento.slice(0,7):'';$('descricao').value=r.descricao;$('valor').value=r.valor;$('tipo').value=r.entrada?'entrada':'saida';$('categoria').value=r.categoria||'';$('metodo').value=r.metodo||'';$('parcela').value=r.parcela||'';$('status').value=r.status||'Pendente';$('subtipo').value=r.entrada?(r.entrada==='Entrada'?'':r.entrada):(r.saida==='Saída'?'':r.saida);updatePaymentMonthField();$('formTitle').textContent='Editar lançamento';$('saveBtn').textContent='Salvar alterações';show('cancelEditBtn',true);window.scrollTo({top:0,behavior:'smooth'});
