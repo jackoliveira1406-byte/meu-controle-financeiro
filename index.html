@@ -378,8 +378,11 @@ try {
     return;
    }
    const series=await findFollowingInstallments(payload.original);
+   if(series.missing.length){
+    throw new Error('Não encontrei todas as parcelas seguintes ('+series.missing.join(', ')+'). Nenhum lançamento foi alterado. Confira se elas estão cadastradas e se a descrição, método, categoria e sequência mensal correspondem.');
+   }
    if(!series.matches.length){
-    throw new Error('Não encontrei as parcelas seguintes correspondentes. Nenhum lançamento foi alterado. Você pode escolher “Somente esta parcela” ou conferir se as parcelas seguintes têm a mesma descrição, método, categoria e sequência mensal.');
+    throw new Error('Não encontrei parcelas seguintes correspondentes. Nenhum lançamento foi alterado. Você pode escolher “Somente esta parcela” ou conferir os dados da sequência.');
    }
    const originalInstallment=parseInstallment(payload.original.parcela);
    const updatedInstallment=parseInstallment(payload.record.parcela);
