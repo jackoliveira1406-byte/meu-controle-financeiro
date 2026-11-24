@@ -289,9 +289,13 @@ try {
  }
  function updatePaymentMonthField(){
   const active=isBradescoCreditCardForm();
+  const editing=!!$('editId').value;
   show('paymentMonthWrap',active);
   $('dataLabel').textContent=active?'Data da compra *':'Data *';
-  $('paymentMonth').required=active;
+  $('paymentMonth').required=active&&!editing;
+  ['categoria','metodo','parcela','status','subtipo'].forEach(function(id){
+   $(id).required=!editing;
+  });
   if(!active)$('paymentMonth').value='';
  }
  function buildAnnualMonthRange(year){
@@ -564,15 +568,18 @@ try {
   event.preventDefault();
   const type=$('tipo').value,sub=$('subtipo').value;
   const id=$('editId').value;
-  const requiredFields=['data','descricao','valor','tipo','categoria','metodo','parcela','status','subtipo'];
-  const missing=requiredFields.find(function(field){return String($(field).value||'').trim()==='';});
-  if(missing){
-   const labels={data:'Data',descricao:'Descrição',valor:'Valor',tipo:'Tipo',categoria:'Categoria',metodo:'Método',parcela:'Parcela',status:'Status',subtipo:'Classificação'};
-   msg('formMessage','Preencha o campo obrigatório: '+labels[missing]+'.','error');$(missing).focus();return;
+  const id=$('editId').value;
+  if(!id){
+   const requiredFields=['data','descricao','valor','tipo','categoria','metodo','parcela','status','subtipo'];
+   const missing=requiredFields.find(function(field){return String($(field).value||'').trim()==='';});
+   if(missing){
+    const labels={data:'Data',descricao:'Descrição',valor:'Valor',tipo:'Tipo',categoria:'Categoria',metodo:'Método',parcela:'Parcela',status:'Status',subtipo:'Classificação'};
+    msg('formMessage','Preencha o campo obrigatório: '+labels[missing]+'.','error');$(missing).focus();return;
+   }
   }
   const cardPurchase=isBradescoCreditCardForm();
   const paymentMonth=$('paymentMonth').value;
-  if(cardPurchase&&!paymentMonth){
+  if(cardPurchase&&!paymentMonth&&!id){
    msg('formMessage','Selecione o mês em que a fatura do Bradesco será paga.','error');
    $('paymentMonth').focus();return;
   }
