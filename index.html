@@ -34,6 +34,26 @@ button:disabled{opacity:.55;cursor:wait}
 .bar.expense{background:#bd7a43}.bar.balance{background:#5478a7}.bar.negative{background:var(--red)}.bar.paid{background:#31845b}.bar.pending{background:#d69b2d}.bar.overdue{background:#c04444}
 .bar-value{font-size:11px;font-weight:700;text-align:center;white-space:nowrap}.bar-label{font-size:11px;color:var(--muted);text-align:center;line-height:1.15;overflow-wrap:anywhere}
 .analytics-grid{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(250px,1fr);gap:16px;align-items:stretch;margin:12px 0 16px}.analytics-chart{min-width:0}.method-breakdown{border:1px solid var(--line);border-radius:12px;background:#fbfdfb;padding:12px;min-width:0}.method-breakdown h3{font-size:15px;margin:0 0 8px}.method-table{min-width:330px;width:100%;table-layout:fixed}.method-table th,.method-table td{padding:9px 6px}.method-table th:not(:first-child),.method-table td:not(:first-child){text-align:right;white-space:nowrap}.method-table td:first-child{overflow-wrap:anywhere}.method-total td{font-weight:750;border-top:1px solid var(--line)}.chart-note{margin:8px 0 0;font-size:12px;color:var(--muted)}
+.chart-toolbar{display:flex;justify-content:space-between;align-items:end;gap:10px;flex-wrap:wrap;margin:0 0 10px}
+.chart-toolbar-title{font-size:14px;font-weight:700}
+.chart-toolbar .actions{align-items:end}
+.chart-toolbar .year-control{width:112px}
+.chart-toolbar .year-control input{min-height:38px;padding:7px}
+.year-chart-scroll{overflow-x:auto;padding-bottom:4px}
+.year-chart-grid{display:grid;grid-template-columns:repeat(12,minmax(44px,1fr));gap:7px;min-width:620px;height:190px;align-items:end;padding:10px 5px;border-bottom:1px solid var(--line)}
+.year-month{height:100%;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:end;gap:7px}
+.year-bars{height:140px;width:100%;display:flex;align-items:end;justify-content:center;gap:3px}
+.year-bar-track{height:120px;width:12px;background:#edf2ef;border-radius:4px;display:flex;align-items:end;overflow:hidden}
+.year-bar{width:100%;height:0;border-radius:4px 4px 0 0;transition:height .25s}
+.year-bar.income{background:var(--green)}
+.year-bar.expense{background:#bd7a43}
+.year-bar.balance{background:#5478a7}
+.year-bar.balance.negative{background:var(--red)}
+.year-month-label{font-size:11px;color:var(--muted);font-weight:650}
+.year-chart-legend{display:flex;gap:14px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.year-chart-legend span{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)}
+.legend-dot{width:9px;height:9px;border-radius:2px;display:inline-block}
+.legend-income{background:var(--green)}.legend-expense{background:#bd7a43}.legend-balance{background:#5478a7}
 .filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:10px;margin:16px 0}
 .value-range{display:grid;grid-template-columns:1fr 1fr;gap:6px}.value-range input{min-width:0}
 .bulk-toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;padding:12px;background:#f4f7f5;border:1px solid var(--line);border-radius:10px;margin-bottom:12px}
@@ -99,15 +119,33 @@ try {
    <div class="topline"><h2>Relatórios e lançamentos</h2><div class="actions"><div><label for="monthFilter">Mês do relatório</label><input id="monthFilter" type="month" value="2026-11"></div><button id="refreshBtn" type="button" class="secondary">Atualizar</button><button id="csvBtn" type="button" class="secondary">Exportar CSV</button></div></div>
    <div class="analytics-grid">
     <div class="analytics-chart">
-     <div class="chart">
-      <div class="chart-col"><div id="incomeValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="incomeBar" class="bar"></div></div><div class="bar-label">Entradas</div></div>
-      <div class="chart-col"><div id="expenseValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="expenseBar" class="bar expense"></div></div><div class="bar-label">Saídas</div></div>
-      <div class="chart-col"><div id="balanceValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="balanceBar" class="bar balance"></div></div><div class="bar-label">Saldo</div></div>
-      <div class="chart-col status-start"><div id="paidValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="paidBar" class="bar paid"></div></div><div class="bar-label">Pago</div></div>
-      <div class="chart-col"><div id="pendingValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="pendingBar" class="bar pending"></div></div><div class="bar-label">Pendente</div></div>
-      <div class="chart-col"><div id="overdueValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="overdueBar" class="bar overdue"></div></div><div class="bar-label">Atrasado</div></div>
+     <div class="chart-toolbar">
+      <span id="chartViewTitle" class="chart-toolbar-title">Resumo do mês</span>
+      <div class="actions">
+       <div id="annualYearControl" class="year-control hidden"><label for="annualYear">Ano</label><input id="annualYear" type="number" min="2000" max="2100" step="1" value="2026"></div>
+       <button id="chartViewToggleBtn" type="button" class="secondary">▼ Ver gráfico anual</button>
+      </div>
      </div>
-     <p class="chart-note">Gráfico e totais atualizados conforme os filtros selecionados.</p>
+     <div id="monthlyChartView">
+      <div class="chart">
+       <div class="chart-col"><div id="incomeValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="incomeBar" class="bar"></div></div><div class="bar-label">Entradas</div></div>
+       <div class="chart-col"><div id="expenseValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="expenseBar" class="bar expense"></div></div><div class="bar-label">Saídas</div></div>
+       <div class="chart-col"><div id="balanceValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="balanceBar" class="bar balance"></div></div><div class="bar-label">Saldo</div></div>
+       <div class="chart-col status-start"><div id="paidValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="paidBar" class="bar paid"></div></div><div class="bar-label">Pago</div></div>
+       <div class="chart-col"><div id="pendingValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="pendingBar" class="bar pending"></div></div><div class="bar-label">Pendente</div></div>
+       <div class="chart-col"><div id="overdueValue" class="bar-value">R$ 0,00</div><div class="bar-track"><div id="overdueBar" class="bar overdue"></div></div><div class="bar-label">Atrasado</div></div>
+      </div>
+      <p class="chart-note">Gráfico e totais atualizados conforme os filtros selecionados.</p>
+     </div>
+     <div id="annualChartView" class="hidden">
+      <div class="year-chart-scroll"><div id="annualChartGrid" class="year-chart-grid" role="img" aria-label="Gráfico anual de entradas, saídas e saldo por mês"></div></div>
+      <div class="year-chart-legend">
+       <span><i class="legend-dot legend-income"></i>Entradas</span>
+       <span><i class="legend-dot legend-expense"></i>Saídas</span>
+       <span><i class="legend-dot legend-balance"></i>Saldo</span>
+      </div>
+      <p id="annualChartNote" class="chart-note">Valores de cada mês do ano selecionado.</p>
+     </div>
     </div>
     <aside class="method-breakdown" aria-labelledby="methodBreakdownTitle">
      <h3 id="methodBreakdownTitle">Entradas e saídas por método</h3>
@@ -247,6 +285,84 @@ try {
   $('dataLabel').textContent=active?'Data da compra *':'Data *';
   $('paymentMonth').required=active&&!$('editId').value;
   if(!active)$('paymentMonth').value='';
+ }
+ function buildAnnualMonthRange(year){
+  const y=String(year);
+  return {start:y+'-01-01',end:(Number(y)+1)+'-01-01'};
+ }
+ async function loadAnnualChart(){
+  const year=Number($('annualYear').value);
+  if(!Number.isInteger(year)||year<2000||year>2100){
+   msg('annualChartNote','Informe um ano válido entre 2000 e 2100.','error');return;
+  }
+  $('annualChartGrid').innerHTML='';
+  msg('annualChartNote','Carregando os lançamentos de '+year+'...','muted');
+  try{
+   const token=await ensureSession();
+   const range=buildAnnualMonthRange(year);
+   const params=new URLSearchParams({select:'*',order:'data.asc',limit:'1000'});
+   params.set('or','(and(data.gte.'+range.start+',data.lt.'+range.end+'),and(data_pagamento.gte.'+range.start+',data_pagamento.lt.'+range.end+'))');
+   const data=await api('/rest/v1/lancamentos?'+params.toString(),{token:token});
+   const rows=(Array.isArray(data)?data:[]).filter(function(row){
+    const reportDate=getReportDate(row);
+    return reportDate>=range.start&&reportDate<range.end;
+   });
+   renderAnnualChart(rows,year);
+  }catch(error){
+   msg('annualChartNote','Não foi possível carregar o gráfico anual: '+error.message,'error');
+  }
+ }
+ function renderAnnualChart(rows,year){
+  const monthNames=['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
+  const totals=monthNames.map(function(){return {income:0,expense:0,balance:0};});
+  rows.forEach(function(row){
+   const reportDate=getReportDate(row);
+   const month=Number(reportDate.slice(5,7))-1;
+   if(month<0||month>11)return;
+   const value=Number(row.valor||0);
+   if(row.entrada)totals[month].income+=value;
+   if(row.saida)totals[month].expense+=value;
+  });
+  totals.forEach(function(item){item.balance=item.income-item.expense;});
+  const max=Math.max.apply(null,totals.reduce(function(values,item){
+   values.push(item.income,item.expense,Math.abs(item.balance));return values;
+  },[1]));
+  const grid=$('annualChartGrid');
+  grid.innerHTML='';
+  totals.forEach(function(item,index){
+   const month=document.createElement('div');month.className='year-month';
+   const bars=document.createElement('div');bars.className='year-bars';
+   [
+    {key:'income',value:item.income,kind:'income',label:'Entradas'},
+    {key:'expense',value:item.expense,kind:'expense',label:'Saídas'},
+    {key:'balance',value:Math.abs(item.balance),kind:item.balance<0?'balance negative':'balance',label:'Saldo'}
+   ].forEach(function(spec){
+    const track=document.createElement('div');track.className='year-bar-track';
+    const bar=document.createElement('div');bar.className='year-bar '+spec.kind;
+    bar.style.height=(spec.value/max*100)+'%';
+    bar.title=monthNames[index]+' - '+spec.label+': '+money(spec.key==='balance'?item.balance:spec.value);
+    track.appendChild(bar);bars.appendChild(track);
+   });
+   const label=document.createElement('div');label.className='year-month-label';label.textContent=monthNames[index];
+   month.appendChild(bars);month.appendChild(label);grid.appendChild(month);
+  });
+  msg('annualChartNote','Ano '+year+' • '+rows.length+' lançamento(s). O gráfico mostra os totais mensais de entradas, saídas e saldo. Passe o cursor sobre as barras para ver os valores.','muted');
+ }
+ function toggleChartView(){
+  const annualIsVisible=!$('annualChartView').classList.contains('hidden');
+  if(annualIsVisible){
+   show('annualChartView',false);show('monthlyChartView',true);show('annualYearControl',false);
+   $('chartViewTitle').textContent='Resumo do mês';
+   $('chartViewToggleBtn').textContent='▼ Ver gráfico anual';
+  }else{
+   show('monthlyChartView',false);show('annualChartView',true);show('annualYearControl',true);
+   $('chartViewTitle').textContent='Resumo do ano';
+   $('chartViewToggleBtn').textContent='▲ Voltar ao gráfico mensal';
+   if(!$('annualYear').value){
+    $('annualYear').value=($('monthFilter').value||new Date().toISOString().slice(0,7)).slice(0,4);
+   }
+   loadAnnualChart();
+  }
  }
  async function loadRows(){
   const token=await ensureSession();
@@ -486,7 +602,14 @@ try {
  $('metodo').addEventListener('change',updatePaymentMonthField);
  $('cancelEditBtn').addEventListener('click',resetForm);
  $('refreshBtn').addEventListener('click',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
- $('monthFilter').addEventListener('change',function(){selectedIds.clear();loadRows().catch(function(e){msg('dataMessage',e.message,'error');});});
+ $('monthFilter').addEventListener('change',function(){
+  selectedIds.clear();
+  loadRows().catch(function(e){msg('dataMessage',e.message,'error');});
+ });
+ $('chartViewToggleBtn').addEventListener('click',toggleChartView);
+ $('annualYear').addEventListener('change',function(){
+  if(!$('annualChartView').classList.contains('hidden'))loadAnnualChart();
+ });
  ['descriptionFilter','typeFilter','categoryFilter','methodFilter','statusFilter','valueMinFilter','valueMaxFilter'].forEach(function(id){
   $(id).addEventListener('input',function(){selectedIds.clear();renderRows();});
   $(id).addEventListener('change',function(){selectedIds.clear();renderRows();});
