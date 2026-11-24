@@ -107,12 +107,12 @@ try {
      <div><label for="descricao">Descrição *</label><input id="descricao" maxlength="200" required></div>
      <div><label for="valor">Valor (R$) *</label><input id="valor" type="number" min="0" step="0.01" required></div>
      <div><label for="tipo">Tipo *</label><select id="tipo" required><option value="">Selecione</option><option value="saida">Saída</option><option value="entrada">Entrada</option></select></div>
-     <div><label for="categoria">Categoria</label><input id="categoria" list="categorias"><datalist id="categorias"><option>Alimentação</option><option>Casa</option><option>Vestuário</option><option>Entretenimento</option><option>Educação</option><option>Ferramentas</option><option>Investimento</option><option>Outros</option></datalist></div>
-     <div><label for="metodo">Método</label><input id="metodo" list="metodos"><datalist id="metodos"><option>Santander</option><option>Nomad</option><option>XP</option><option>Bradesco</option><option>Inter</option><option>Mercado Pago</option><option>Espécie</option><option>C6</option><option>Porto</option></datalist></div>
+     <div><label for="categoria">Categoria *</label><input id="categoria" list="categorias" required><datalist id="categorias"><option>Alimentação</option><option>Casa</option><option>Vestuário</option><option>Entretenimento</option><option>Educação</option><option>Ferramentas</option><option>Investimento</option><option>Outros</option></datalist></div>
+     <div><label for="metodo">Método *</label><input id="metodo" list="metodos" required><datalist id="metodos"><option>Santander</option><option>Nomad</option><option>XP</option><option>Bradesco</option><option>Inter</option><option>Mercado Pago</option><option>Espécie</option><option>C6</option><option>Porto</option></datalist></div>
      <div id="paymentMonthWrap" class="hidden"><label for="paymentMonth">Mês de pagamento da fatura *</label><input id="paymentMonth" type="month"><small class="muted">O vencimento será registrado no dia 10 do mês escolhido. Para compras no melhor dia (30), normalmente selecione o mês seguinte.</small></div>
-     <div><label for="parcela">Parcela</label><input id="parcela" placeholder="Ex.: 1/3"></div>
-     <div><label for="status">Status</label><select id="status"><option>Pago</option><option selected>Pendente</option><option>Atrasado</option></select></div>
-     <div><label for="subtipo">Classificação</label><select id="subtipo"><option value="">Não se aplica</option><option value="fixos">Fixos</option><option value="cartao de credito">Cartão de crédito</option><option value="boletos">Boletos</option><option value="dinheiro">Dinheiro</option><option value="recebidos">Recebidos</option><option value="pagamentos">Pagamentos</option><option value="extra">Extra</option></select></div>
+     <div><label for="parcela">Parcela *</label><input id="parcela" placeholder="Ex.: 1/3 ou Única" required><small class="muted">Informe a parcela ou digite “Única” quando não houver parcelamento.</small></div>
+     <div><label for="status">Status *</label><select id="status" required><option value="" selected>Selecione...</option><option>Pago</option><option>Pendente</option><option>Atrasado</option></select></div>
+     <div><label for="subtipo">Classificação *</label><select id="subtipo" required><option value="" selected>Selecione...</option><option value="na">Não se aplica</option><option value="fixos">Fixos</option><option value="cartao de credito">Cartão de crédito</option><option value="boletos">Boletos</option><option value="dinheiro">Dinheiro</option><option value="recebidos">Recebidos</option><option value="pagamentos">Pagamentos</option><option value="extra">Extra</option></select></div>
     </div>
     <div class="actions" style="margin-top:14px"><button type="submit" id="saveBtn">Salvar lançamento</button><button type="button" id="cancelEditBtn" class="secondary hidden">Cancelar edição</button><span id="formMessage" class="muted"></span></div>
    </form>
@@ -291,7 +291,7 @@ try {
   const active=isBradescoCreditCardForm();
   show('paymentMonthWrap',active);
   $('dataLabel').textContent=active?'Data da compra *':'Data *';
-  $('paymentMonth').required=active&&!$('editId').value;
+  $('paymentMonth').required=active;
   if(!active)$('paymentMonth').value='';
  }
  function buildAnnualMonthRange(year){
@@ -564,13 +564,20 @@ try {
   event.preventDefault();
   const type=$('tipo').value,sub=$('subtipo').value;
   const id=$('editId').value;
+  const requiredFields=['data','descricao','valor','tipo','categoria','metodo','parcela','status','subtipo'];
+  const missing=requiredFields.find(function(field){return String($(field).value||'').trim()==='';});
+  if(missing){
+   const labels={data:'Data',descricao:'Descrição',valor:'Valor',tipo:'Tipo',categoria:'Categoria',metodo:'Método',parcela:'Parcela',status:'Status',subtipo:'Classificação'};
+   msg('formMessage','Preencha o campo obrigatório: '+labels[missing]+'.','error');$(missing).focus();return;
+  }
   const cardPurchase=isBradescoCreditCardForm();
   const paymentMonth=$('paymentMonth').value;
-  if(cardPurchase&&!paymentMonth&&!id){
+  if(cardPurchase&&!paymentMonth){
    msg('formMessage','Selecione o mês em que a fatura do Bradesco será paga.','error');
    $('paymentMonth').focus();return;
   }
-  const record={data:$('data').value,data_pagamento:cardPurchase&&paymentMonth?paymentMonth+'-10':null,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim()||null,metodo:$('metodo').value.trim()||null,categoria:$('categoria').value.trim()||null,saida:type==='saida'?(sub||'Saída'):null,entrada:type==='entrada'?(sub||'Entrada'):null,status:$('status').value};
+  const classification=sub==='na'?'':sub;
+  const record={data:$('data').value,data_pagamento:cardPurchase?paymentMonth+'-10':null,descricao:$('descricao').value.trim(),valor:Number($('valor').value),parcela:$('parcela').value.trim(),metodo:$('metodo').value.trim(),categoria:$('categoria').value.trim(),saida:type==='saida'?(classification||'Saída'):null,entrada:type==='entrada'?(classification||'Entrada'):null,status:$('status').value};
   try{
    const token=await ensureSession();
    let path='/rest/v1/lancamentos',method='POST';
@@ -593,7 +600,7 @@ try {
    const query=new URLSearchParams();query.set('id','eq.'+String(r.id));
    const deleted=await api('/rest/v1/lancamentos?'+query.toString(),{method:'DELETE',token:token,prefer:'return=representation'});
    if(!Array.isArray(deleted)||deleted.length===0){
-    throw new Error('O Supabase não confirmou a exclusão. Confira se a política de exclusão foi criada no banco de dados.');
+    throw new Error('O Supabase não excluiu o registro. A causa mais provável é a falta de uma política RLS de DELETE para este usuário. O botão está funcionando, mas o banco precisa autorizar a exclusão.');
    }
    selectedIds.delete(String(r.id));
    await loadRows();
