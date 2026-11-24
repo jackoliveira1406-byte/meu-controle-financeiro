@@ -353,7 +353,6 @@ try {
  function openInstallmentEditModal(original){
   const parsed=parseInstallment(original.parcela);
   $('installmentModalText').textContent='Você está alterando a parcela '+parsed.current+'/'+parsed.total+'. Escolha se deseja aplicar a alteração somente a esta parcela ou também às parcelas seguintes da mesma compra. As parcelas anteriores, a numeração e as datas próprias de cada mês serão preservadas.';
-  pendingInstallmentEdit=true;
   show('installmentEditModal',true);
  }
  function closeInstallmentEditModal(){
@@ -381,6 +380,11 @@ try {
    if(!series.matches.length){
     throw new Error('Não encontrei as parcelas seguintes correspondentes. Nenhum lançamento foi alterado. Você pode escolher “Somente esta parcela” ou conferir se as parcelas seguintes têm a mesma descrição, método, categoria e sequência mensal.');
    }
+   const originalInstallment=parseInstallment(payload.original.parcela);
+   const updatedInstallment=parseInstallment(payload.record.parcela);
+   if(!updatedInstallment||updatedInstallment.current!==originalInstallment.current){
+    throw new Error('Para atualizar esta e as próximas parcelas, mantenha o número desta parcela ('+originalInstallment.current+') e informe um total válido, por exemplo '+originalInstallment.current+'/'+originalInstallment.total+'.');
+   }
    const shared={
     descricao:payload.record.descricao,
     valor:payload.record.valor,
@@ -389,6 +393,7 @@ try {
     saida:payload.record.saida,
     entrada:payload.record.entrada,
     status:payload.record.status,
+    parcela:updatedInstallment.current+'/'+updatedInstallment.total,
     atualizado_em:new Date().toISOString()
    };
    const allIds=[payload.id].concat(series.matches.map(function(row){return String(row.id);}));
